@@ -1,10 +1,12 @@
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use crate::App;
+use crate::{minecraft, App};
 
 #[derive(Debug)]
-pub enum IoEvent {}
+pub enum IoEvent {
+    FetchMinecraftVersionManifest,
+}
 
 #[derive(Clone)]
 pub struct Io<'a> {
@@ -16,7 +18,27 @@ impl<'a> Io<'a> {
         Io { app }
     }
 
-    pub async fn handle_io_event(&mut self, io_event: IoEvent) {
-        match io_event {}
+    pub async fn handle_io_event(&mut self, io_event: IoEvent) -> ::anyhow::Result<()> {
+        use IoEvent::*;
+
+        match io_event {
+            FetchMinecraftVersionManifest => {
+                let data_file_path = {
+                    self.app
+                        .lock()
+                        .await
+                        .paths
+                        .file
+                        .minecraft_versions_cache
+                        .clone()
+                };
+
+                let manifest = minecraft::VersionManifest::fetch(&data_file_path).await?;
+                let mut app = self.app.lock().await;
+                app.minecraft_version_manifest = Some(manifest);
+            }
+        }
+
+        Ok(())
     }
 }

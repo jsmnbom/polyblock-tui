@@ -3,7 +3,7 @@ use array_tool::vec::Intersect;
 use log::{debug, trace, warn};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{hash_map, HashMap, HashSet},
     fs,
     io::{BufReader, BufWriter},
     path::PathBuf,
@@ -83,7 +83,7 @@ impl Instance {
         for path in mod_paths.into_iter() {
             let full_path = mods_dir.join(&path);
             match self.mods.entry(path) {
-                std::collections::hash_map::Entry::Occupied(mut entry) => {
+                hash_map::Entry::Occupied(mut entry) => {
                     let mut info = entry.get_mut();
                     if full_path.is_file() {
                         if info.file.is_none() {
@@ -99,7 +99,7 @@ impl Instance {
                         }
                     }
                 }
-                std::collections::hash_map::Entry::Vacant(entry) => {
+                hash_map::Entry::Vacant(entry) => {
                     let file_info = ModFileInfo::from_file(&full_path)?;
                     entry.insert(ModInfo {
                         file: Some(file_info),
@@ -217,8 +217,9 @@ impl Instances {
     }
 
     pub fn save(&self) -> ::anyhow::Result<()> {
-        let writer =
-            BufWriter::new(fs::File::create(&self.path).context("Could not create instance file.")?);
+        let writer = BufWriter::new(
+            fs::File::create(&self.path).context("Could not create instance file.")?,
+        );
         let data: HashMap<String, FileInstance> = self
             .inner
             .clone()

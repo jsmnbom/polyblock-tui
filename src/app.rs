@@ -1,6 +1,6 @@
 use std::sync::mpsc::Sender;
 
-use crate::{IoEvent, minecraft, view, Instances, Opt, Paths};
+use crate::{minecraft, view, Instances, IoEvent, Opt, Paths};
 
 #[derive(Clone)]
 pub enum RouteId {
@@ -26,6 +26,7 @@ pub struct App {
     pub paths: Paths,
     pub launcher: minecraft::Launcher,
     pub hide_cursor: bool,
+    pub minecraft_version_manifest: Option<minecraft::VersionManifest>,
 }
 
 impl App {
@@ -53,6 +54,7 @@ impl App {
             instances,
             launcher,
             hide_cursor: true,
+            minecraft_version_manifest: None,
         })
     }
 

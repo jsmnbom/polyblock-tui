@@ -7,7 +7,7 @@ use crate::Opt;
 
 #[derive(Debug, Clone)]
 pub struct FilePaths {
-    pub versions_cache: PathBuf,
+    pub minecraft_versions_cache: PathBuf,
     pub forge_versions_cache: PathBuf,
     pub config: PathBuf,
     pub instances: PathBuf,
@@ -60,7 +60,7 @@ impl Paths {
 
         Ok(Self {
             file: FilePaths {
-                versions_cache: directory_paths.cache.join("versions.json"),
+                minecraft_versions_cache: directory_paths.cache.join("versions.json"),
                 forge_versions_cache: directory_paths.cache.join("forge.json"),
                 instances: directory_paths.data.join("instances.json"),
                 config: directory_paths.data.join("config.json"),

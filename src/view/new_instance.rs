@@ -9,17 +9,19 @@ use tui::{
 };
 use unicode_width::UnicodeWidthStr;
 
-use crate::{ui::RenderState, util, App, Key};
+use crate::{ui::RenderState, util, App, IoEvent, Key};
 
+#[derive(Clone)]
 pub enum InnerState {
     EnterName,
-    FetchMinecraftVersions,
+    FetchMinecraftVersionManifest,
     ChooseMinecraftVersion,
     ChooseForge,
-    FetchForgeVersions,
+    FetchForgeVersionManifest,
     ChooseForgeVersion,
 }
 
+#[derive(Clone)]
 pub struct State {
     pub inner: InnerState,
     name_input: String,
@@ -36,41 +38,51 @@ impl Default for State {
     }
 }
 
-pub fn get_help(_app: &App) -> Vec<(&'static str, &'static str)> {
-    vec![("←→", "move cursor"), ("⏎", "continue"), ("ESC", "cancel")]
+pub fn get_help(app: &App) -> Vec<(&'static str, &'static str)> {
+    match app.new_instance.inner {
+        InnerState::EnterName => vec![("←→", "move cursor"), ("⏎", "continue"), ("ESC", "cancel")],
+        InnerState::FetchMinecraftVersionManifest => Vec::new(),
+        _ => unimplemented!(),
+    }
 }
 
 pub fn handle_key(key: Key, app: &mut App) {
-    let state = &mut app.new_instance;
-
-    match &state.inner {
+    match app.new_instance.inner {
         InnerState::EnterName => {
-            let existing_names: Vec<&String> = app.instances.inner.keys().collect();
-
             match key {
                 Key::Char(c) => {
-                    state.name_input.push(c);
+                    app.new_instance.name_input.push(c);
                 }
                 Key::Backspace => {
-                    state.name_input.pop();
+                    app.new_instance.name_input.pop();
                 }
                 Key::Enter => {
                     // delay_for(Duration::from_secs(5)).await;
-                    // if !state.name_input.is_empty() {
-                    //     state.inner = InnerState::FetchMinecraftVersions;
+                    // if !app.new_instance.name_input.is_empty() {
+                    //     app.new_instance.inner = InnerState::FetchMinecraftVersions;
                     // }
+                    app.new_instance.inner = InnerState::FetchMinecraftVersionManifest;
+                    app.dispatch(IoEvent::FetchMinecraftVersionManifest);
                 }
                 _ => {}
             }
 
-            if state.name_input.is_empty() {
-                state.error = Some("You must enter a name!".to_string())
-            } else if existing_names.contains(&&state.name_input) {
-                state.error = Some("An instance with that name already exists!".to_string())
+            if app.new_instance.name_input.is_empty() {
+                app.new_instance.error = Some("You must enter a name!".to_string())
+            } else if app
+                .instances
+                .inner
+                .keys()
+                .collect::<Vec<&String>>()
+                .contains(&&app.new_instance.name_input)
+            {
+                app.new_instance.error =
+                    Some("An instance with that name already exists!".to_string())
             } else {
-                state.error = None;
+                app.new_instance.error = None;
             }
         }
+        InnerState::FetchMinecraftVersionManifest => {}
         _ => unimplemented!(),
     }
 }
@@ -78,6 +90,9 @@ pub fn handle_key(key: Key, app: &mut App) {
 pub fn draw<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) -> RenderState {
     match &app.new_instance.inner {
         InnerState::EnterName => draw_enter_name(f, app, chunk),
+        InnerState::FetchMinecraftVersionManifest => {
+            draw_loading("Loading minecraft version manifest...", f, app, chunk)
+        }
         _ => unimplemented!(),
     }
 }
@@ -89,8 +104,6 @@ fn draw_enter_name<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) -> Rend
     rect.y = (rect.height / 2) - 3;
     rect.height = if state.error.is_some() { 4 } else { 3 };
 
-    // app.hide_cursor = false;
-
     let mut text = vec![Text::raw(&state.name_input)];
     if let Some(error) = &state.error {
         text.push(Text::raw("\n\r"));
@@ -101,7 +114,6 @@ fn draw_enter_name<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) -> Rend
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .title_style(Style::default())
                 .title("Enter new instance name"),
         );
 
@@ -118,4 +130,20 @@ fn draw_enter_name<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) -> Rend
     f.render_widget(input, rect);
 
     RenderState::default().show_cursor()
+}
+
+fn draw_loading<B: Backend>(msg: &str, f: &mut Frame<B>, _app: &App, chunk: Rect) -> RenderState {
+    let mut rect = util::centered_rect_percentage_dir(Direction::Horizontal, 30, chunk);
+    rect.y = (rect.height / 2) - 3;
+    rect.height = 3;
+
+    let text = vec![Text::raw(msg)];
+    let input = Paragraph::new(text.iter())
+        .style(Style::default().fg(Color::Yellow))
+        .block(Block::default().borders(Borders::ALL));
+
+    f.render_widget(Clear, rect);
+    f.render_widget(input, rect);
+
+    RenderState::default()
 }

@@ -161,6 +161,9 @@ async fn main() -> ::anyhow::Result<()> {
 #[tokio::main]
 async fn io_inner(io_rx: Receiver<IoEvent>, io: &mut Io) {
     while let Ok(io_event) = io_rx.recv() {
-        io.handle_io_event(io_event).await;
+        match io.handle_io_event(io_event).await {
+            Ok(_) => {}
+            Err(e) => panic!(e),
+        };
     }
 }
