@@ -65,7 +65,7 @@ pub enum Key {
     Char(char),
     Ctrl(char),
     Alt(char),
-    Unkown,
+    Unknown,
 }
 
 impl Key {
@@ -175,7 +175,7 @@ impl From<event::KeyEvent> for Key {
                 ..
             } => Key::Char(c),
 
-            _ => Key::Unkown,
+            _ => Key::Unknown,
         }
     }
 }

@@ -1,45 +1,71 @@
-use tui::{
-    backend::CrosstermBackend,
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
-    widgets::{
-        Block, BorderType, Borders, Clear, Gauge, List, Paragraph, Row, Table, TableState, Text,
-    },
-    Terminal,
-};
+use std::sync::mpsc::Sender;
 
+use crate::{IoEvent, minecraft, view, Instances, Opt, Paths};
+
+#[derive(Clone)]
 pub enum RouteId {
     Home,
     InstanceMenu,
+    NewInstance,
 }
 
+#[derive(Clone)]
 pub struct Route {
     pub id: RouteId,
     modal: bool,
 }
 
 pub struct App {
+    io_tx: Sender<IoEvent>,
     route_stack: Vec<Route>,
-    pub home_selected_instance: usize,
-    pub instance_menu_selected: usize,
+    pub home: view::home::State,
+    pub instance_menu: view::instance_menu::State,
+    pub new_instance: view::new_instance::State,
     pub should_quit: bool,
+    pub instances: Instances,
+    pub paths: Paths,
+    pub launcher: minecraft::Launcher,
+    pub hide_cursor: bool,
 }
 
 impl App {
-    pub fn new() -> Self {
-        Self {
-            route_stack: Vec::new(),
-            home_selected_instance: 0,
-            instance_menu_selected: 0,
+    pub fn new(opt: &Opt, io_tx: Sender<IoEvent>) -> ::anyhow::Result<Self> {
+        let paths = Paths::new(opt)?;
+        let instances = Instances::from_file(&paths.file.instances, &paths.directory.instances)?;
+
+        let launcher = minecraft::Launcher::new(
+            &paths.directory.launcher_work,
+            &paths.directory.launcher_cache,
+            opt.launcher.as_ref(),
+        )?;
+
+        Ok(Self {
+            io_tx,
+            route_stack: vec![Route {
+                id: RouteId::Home,
+                modal: false,
+            }],
+            home: Default::default(),
+            instance_menu: Default::default(),
+            new_instance: Default::default(),
             should_quit: false,
-        }
+            paths,
+            instances,
+            launcher,
+            hide_cursor: true,
+        })
     }
 
-    pub fn push_route_stack(&mut self, id: RouteId, modal: bool) {
+    /// Send a io event to the io thread
+    pub fn dispatch(&mut self, action: IoEvent) {
+        self.io_tx.send(action).unwrap();
+    }
+
+    pub fn push_route(&mut self, id: RouteId, modal: bool) {
         self.route_stack.push(Route { id, modal });
     }
 
-    pub fn pop_route_stack(&mut self) -> Option<Route> {
+    pub fn pop_route(&mut self) -> Option<Route> {
         if self.route_stack.len() == 1 {
             None
         } else {
