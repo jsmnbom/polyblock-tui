@@ -4,6 +4,7 @@ use log::debug;
 use reqwest;
 use serde::{Deserialize, Serialize};
 use std::{
+    cmp::Reverse,
     fs::File,
     io::{BufReader, BufWriter},
     path::PathBuf,
@@ -51,9 +52,11 @@ pub struct Data {
 }
 
 impl VersionManifest {
-    pub async fn fetch(data_file_path: &PathBuf) -> ::anyhow::Result<Self> {
+    pub async fn fetch(
+        client: &reqwest::Client,
+        data_file_path: &PathBuf,
+    ) -> ::anyhow::Result<Self> {
         // TODO: If less than 15 min since cache was saved, don't even bother the server at all
-        let client = reqwest::Client::new();
 
         let cached_data = match File::open(data_file_path) {
             Ok(file) => {
@@ -84,7 +87,7 @@ impl VersionManifest {
             .as_ref()
             .map(|etag| etag.to_str().unwrap().to_owned());
 
-        let manifest = match response.status() {
+        let mut manifest = match response.status() {
             reqwest::StatusCode::NOT_MODIFIED => {
                 debug!("Not modified - cache hit.");
                 cached_data.clone().unwrap().manifest
@@ -110,6 +113,10 @@ impl VersionManifest {
             );
             serde_json::to_writer(writer, &data)?;
         }
+
+        manifest
+            .versions
+            .sort_unstable_by_key(|version| Reverse(version.release_time));
 
         Ok(manifest)
     }

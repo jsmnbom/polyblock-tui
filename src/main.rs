@@ -114,15 +114,23 @@ async fn main() -> ::anyhow::Result<()> {
     let backend = CrosstermBackend::new(stdout());
     let mut terminal = Terminal::new(backend)?;
 
-    let events = Events::new(100);
+    let events = Events::new(25, 250);
 
     let (io_tx, io_rx) = channel::<IoEvent>();
 
     let app = Arc::new(Mutex::new(App::new(&opt, io_tx)?));
-
     let cloned_app = Arc::clone(&app);
+
+    let reqwest_client = reqwest::Client::builder()
+        .gzip(true)
+        .user_agent(concat!(
+            env!("CARGO_PKG_NAME"),
+            "/",
+            env!("CARGO_PKG_VERSION")
+        ))
+        .build()?;
     std::thread::spawn(move || {
-        let mut io = Io::new(&app);
+        let mut io = Io::new(&app, reqwest_client);
         io_inner(io_rx, &mut io);
     });
 
@@ -131,15 +139,19 @@ async fn main() -> ::anyhow::Result<()> {
 
         terminal.draw(|mut f| ui::draw_layout(&mut f, &mut app))?;
 
-        match events.next()? {
-            Event::Input(key) => {
-                if key == Key::Ctrl('c') {
-                    break;
-                }
+        #[allow(irrefutable_let_patterns)]
+        while let event = events.next()? {
+            match event {
+                Event::Input(key) => {
+                    if key == Key::Ctrl('c') {
+                        app.should_quit = true;
+                        break;
+                    }
 
-                input::handle(key, &mut app);
+                    input::handle(key, &mut app);
+                }
+                Event::Tick => break,
             }
-            Event::Tick => {}
         }
 
         if app.should_quit {
