@@ -18,14 +18,18 @@ pub struct Route {
 pub struct App {
     io_tx: Sender<IoEvent>,
     route_stack: Vec<Route>,
+
     pub home: view::home::State,
     pub instance_menu: view::instance_menu::State,
     pub new_instance: view::new_instance::State,
+
     pub should_quit: bool,
+    pub hide_cursor: bool,
+
     pub instances: Instances,
     pub paths: Paths,
     pub launcher: minecraft::Launcher,
-    pub hide_cursor: bool,
+
     pub minecraft_version_manifest: Option<minecraft::VersionManifest>,
 }
 
