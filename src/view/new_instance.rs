@@ -2,7 +2,7 @@ use crossterm::{cursor::MoveTo, execute};
 use std::io::{self, Write};
 use tui::{
     backend::Backend,
-    layout::{Constraint, Direction, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     widgets::{Block, BorderType, Borders, Clear, Paragraph, Row, Table, TableState, Text},
     Frame,
@@ -19,6 +19,7 @@ pub enum InnerState {
     ChooseForge,
     FetchForgeVersionManifest,
     ChooseForgeVersion,
+    Install,
 }
 
 #[derive(Clone)]
@@ -27,7 +28,7 @@ pub struct State {
     name_input: String,
     error: Option<String>,
     selected: usize,
-    choose_minecraft_version_rows: Vec<Row<std::vec::IntoIter<std::string::String>>>,
+    chosen_minecraft_version: Option<minecraft::VersionManifestVersion>,
 }
 
 impl Default for State {
@@ -37,18 +38,29 @@ impl Default for State {
             name_input: String::new(),
             error: None,
             selected: 0,
-            choose_minecraft_version_rows: Vec::new(),
+            chosen_minecraft_version: None,
         }
     }
 }
 
 pub fn get_help(app: &App) -> Vec<(&'static str, &'static str)> {
     match app.new_instance.inner {
-        InnerState::EnterName => vec![("←→", "move cursor"), ("⏎", "continue"), ("ESC", "cancel")],
+        InnerState::EnterName => vec![
+            // TODO: ("←/→", "move cursor"),
+            ("⏎", "continue"),
+            ("ESC", "cancel"),
+        ],
         InnerState::FetchMinecraftVersionManifest => Vec::new(),
         InnerState::ChooseMinecraftVersion => vec![
-            ("↑↓", "move cursor"),
+            ("↑↓", "choose version"),
             ("PgUp/PgDn", "move cursor 25"),
+            ("⏎", "select"),
+            ("ESC", "cancel"),
+        ],
+        InnerState::ChooseForge => vec![
+            ("←/→", "choose option"),
+            ("Y", "yes"),
+            ("N", "no"),
             ("⏎", "select"),
             ("ESC", "cancel"),
         ],
@@ -113,9 +125,43 @@ pub fn handle_key(key: Key, app: &mut App) {
                     app.new_instance.selected =
                         util::wrap_add(app.new_instance.selected, versions_len, 25)
                 }
+                Key::Enter => {
+                    app.new_instance.chosen_minecraft_version = Some(
+                        app.minecraft_version_manifest
+                            .as_ref()
+                            .unwrap()
+                            .versions
+                            .get(app.new_instance.selected)
+                            .unwrap()
+                            .clone(),
+                    );
+                    app.new_instance.selected = 0;
+                    app.new_instance.inner = InnerState::ChooseForge;
+                }
                 _ => {}
             }
         }
+        InnerState::ChooseForge => match key {
+            Key::Left => app.new_instance.selected = util::wrap_dec(app.new_instance.selected, 2),
+            Key::Right => app.new_instance.selected = util::wrap_inc(app.new_instance.selected, 2),
+            Key::Char('y') => {
+                app.new_instance.inner = InnerState::FetchForgeVersionManifest;
+                app.new_instance.selected = 0;
+            }
+            Key::Char('n') => {
+                app.new_instance.inner = InnerState::Install;
+                app.new_instance.selected = 0;
+            }
+            Key::Enter => {
+                if app.new_instance.selected == 0 {
+                    app.new_instance.inner = InnerState::FetchForgeVersionManifest;
+                } else {
+                    app.new_instance.inner = InnerState::Install;
+                }
+                app.new_instance.selected = 0;
+            }
+            _ => {}
+        },
         _ => unimplemented!(),
     }
 }
@@ -127,6 +173,7 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) -> RenderState
             draw_loading("Loading minecraft version manifest...", f, app, chunk)
         }
         InnerState::ChooseMinecraftVersion => draw_choose_minecraft_version(f, app, chunk),
+        InnerState::ChooseForge => draw_choose_forge(f, app, chunk),
         _ => unimplemented!(),
     }
 }
@@ -135,7 +182,7 @@ fn draw_enter_name<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) -> Rend
     let state = &app.new_instance;
 
     let mut rect = util::centered_rect_percentage_dir(Direction::Horizontal, 30, chunk);
-    rect.y = (rect.height / 2) - 3;
+    rect.y = (rect.height / 2) - 2;
     rect.height = if state.error.is_some() { 4 } else { 3 };
 
     let mut text = vec![Text::raw(&state.name_input)];
@@ -168,9 +215,7 @@ fn draw_enter_name<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) -> Rend
 }
 
 fn draw_loading<B: Backend>(msg: &str, f: &mut Frame<B>, _app: &App, chunk: Rect) -> RenderState {
-    let mut rect = util::centered_rect_percentage_dir(Direction::Horizontal, 30, chunk);
-    rect.y = (rect.height / 2) - 3;
-    rect.height = 3;
+    let rect = util::centered_rect(3, msg.width() as u16 + 2, chunk);
 
     let text = vec![Text::raw(msg)];
     let input = Paragraph::new(text.iter())
@@ -254,6 +299,76 @@ pub fn draw_choose_minecraft_version<'a, B: Backend>(
 
     f.render_widget(Clear, rect);
     f.render_stateful_widget(table, rect, &mut state);
+
+    RenderState::default()
+}
+
+pub fn draw_choose_forge<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) -> RenderState {
+    let mut rect = util::centered_rect_percentage_dir(Direction::Horizontal, 60, chunk);
+    rect.y = (rect.height / 2) - 5;
+    rect.height = 10;
+
+    let block_widget = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Plain);
+    f.render_widget(Clear, rect);
+    f.render_widget(block_widget, rect);
+    rect.x += 2;
+    rect.width -= 4;
+
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(
+            [
+                Constraint::Length(1),
+                Constraint::Min(5),
+                Constraint::Length(1),
+                Constraint::Length(2),
+            ]
+            .as_ref(),
+        )
+        .split(rect);
+
+    let text = vec![Text::raw("You will need a forge version to be able to install mods. Using the recommended version is usually a good idea unless you know you need another version. Would you like to install forge for this instance?")];
+    let text_widget = Paragraph::new(text.iter())
+        .alignment(Alignment::Center)
+        .style(Style::default().fg(Color::Yellow))
+        .wrap(true);
+
+    f.render_widget(text_widget, layout[1]);
+
+    let button_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(
+            [
+                Constraint::Length((layout[2].width - 16) / 2),
+                Constraint::Length(7),
+                Constraint::Length(3),
+                Constraint::Length(6),
+                Constraint::Length((layout[2].width / 16) / 2),
+            ]
+            .as_ref(),
+        )
+        .split(layout[2]);
+
+    f.render_widget(
+        Paragraph::new(vec![Text::raw("[ Yes ]")].iter()).style(
+            if app.new_instance.selected == 0 {
+                Style::default().fg(Color::Blue).modifier(Modifier::BOLD)
+            } else {
+                Style::default().modifier(Modifier::DIM)
+            },
+        ),
+        button_layout[1],
+    );
+    f.render_widget(
+        Paragraph::new(vec![Text::raw("[ No ]")].iter()).style(if app.new_instance.selected != 0 {
+            Style::default().fg(Color::Blue).modifier(Modifier::BOLD)
+        } else {
+            Style::default().modifier(Modifier::DIM)
+        }),
+        button_layout[3],
+    );
 
     RenderState::default()
 }

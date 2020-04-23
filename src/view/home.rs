@@ -15,7 +15,7 @@ pub struct State {
 
 pub fn get_help(_app: &App) -> Vec<(&'static str, &'static str)> {
     vec![
-        ("↑↓", "move cursor"),
+        ("↑/↓", "choose instance"),
         ("⏎", "select"),
         ("ctrl+N", "new instance"),
         ("ctrl+R", "remove instance"),

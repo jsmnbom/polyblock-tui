@@ -71,7 +71,7 @@ pub struct State {
 }
 
 pub fn get_help(_app: &App) -> Vec<(&'static str, &'static str)> {
-    vec![("↑↓", "move cursor"), ("⏎", "select"), ("ESC", "back")]
+    vec![("↑/↓", "move cursor"), ("⏎", "select"), ("ESC", "back")]
 }
 
 pub fn handle_key(key: Key, app: &mut App) {
