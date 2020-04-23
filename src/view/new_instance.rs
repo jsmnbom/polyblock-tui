@@ -1,8 +1,5 @@
 use crossterm::{cursor::MoveTo, execute};
-use std::{
-    cmp::Reverse,
-    io::{self, Write},
-};
+use std::io::{self, Write};
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Rect},
@@ -92,29 +89,33 @@ pub fn handle_key(key: Key, app: &mut App) {
             }
         }
         InnerState::FetchMinecraftVersionManifest => {}
-        InnerState::ChooseMinecraftVersion => match key {
-            Key::Up => {
-                app.new_instance.selected = util::wrap_dec(
-                    app.new_instance.selected,
-                    app.minecraft_version_manifest
-                        .as_ref()
-                        .unwrap()
-                        .versions
-                        .len(),
-                )
+        InnerState::ChooseMinecraftVersion => {
+            let versions_len = app
+                .minecraft_version_manifest
+                .as_ref()
+                .unwrap()
+                .versions
+                .len();
+            match key {
+                Key::Up => {
+                    app.new_instance.selected =
+                        util::wrap_dec(app.new_instance.selected, versions_len)
+                }
+                Key::Down => {
+                    app.new_instance.selected =
+                        util::wrap_inc(app.new_instance.selected, versions_len)
+                }
+                Key::PageUp => {
+                    app.new_instance.selected =
+                        util::wrap_sub(app.new_instance.selected, versions_len, 25)
+                }
+                Key::PageDown => {
+                    app.new_instance.selected =
+                        util::wrap_add(app.new_instance.selected, versions_len, 25)
+                }
+                _ => {}
             }
-            Key::Down => {
-                app.new_instance.selected = util::wrap_inc(
-                    app.new_instance.selected,
-                    app.minecraft_version_manifest
-                        .as_ref()
-                        .unwrap()
-                        .versions
-                        .len(),
-                )
-            }
-            _ => {}
-        },
+        }
         _ => unimplemented!(),
     }
 }

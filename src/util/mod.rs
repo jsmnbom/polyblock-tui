@@ -13,18 +13,30 @@ pub mod java;
 pub use events::{Event, Events, Key};
 
 pub fn wrap_dec(cur: usize, max: usize) -> usize {
-    if cur == 0 {
-        max - 1
-    } else {
-        cur - 1
-    }
+    wrap_sub(cur, max, 1)
 }
 
 pub fn wrap_inc(cur: usize, max: usize) -> usize {
-    if cur >= max - 1 {
+    wrap_add(cur, max, 1)
+}
+
+pub fn wrap_sub(cur: usize, max: usize, change: usize) -> usize {
+    if cur == 0 {
+        max - 1
+    } else if cur < change {
         0
     } else {
-        cur + 1
+        cur - change
+    }
+}
+
+pub fn wrap_add(cur: usize, max: usize, change: usize) -> usize {
+    if cur == max - 1 {
+        0
+    } else if cur > max - change {
+        max - 1
+    } else {
+        cur + change
     }
 }
 
