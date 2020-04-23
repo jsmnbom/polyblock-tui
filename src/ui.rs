@@ -1,3 +1,5 @@
+use log::trace;
+use std::time::Instant;
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout},
@@ -26,13 +28,14 @@ impl RenderState {
 }
 
 pub fn draw_layout<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+    let instant = Instant::now();
+    let routes = app.get_current_routes();
+
     let parent_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(1), Constraint::Length(1)].as_ref())
         .margin(0)
         .split(f.size());
-
-    let routes = app.get_current_routes();
 
     let raw_help = match routes.last().unwrap().id {
         RouteId::Home => view::home::get_help(app),
@@ -68,4 +71,6 @@ pub fn draw_layout<B: Backend>(f: &mut Frame<B>, app: &mut App) {
 
     let last_render_state = render_states.last().unwrap();
     app.hide_cursor = last_render_state.hide_cursor;
+
+    trace!("Drawing took {:?}", instant.elapsed());
 }
