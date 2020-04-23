@@ -104,6 +104,8 @@ async fn main() -> ::anyhow::Result<()> {
         panic_hook(info);
     }));
 
+    env_logger::init();
+
     let opt = Opt::from_args();
 
     execute!(stdout(), EnterAlternateScreen, EnableMouseCapture)?;

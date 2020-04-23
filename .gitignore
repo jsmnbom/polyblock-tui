@@ -18,3 +18,6 @@ Cargo.lock
 # Temporary local files
 # I use it to inspect .jar files and still have them within the development folder
 /resources/tmp
+
+# Tmp log file for quick debugging
+tmp.log
