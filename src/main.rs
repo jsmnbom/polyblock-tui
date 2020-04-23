@@ -19,6 +19,7 @@ use tokio::sync::Mutex;
 use tui::{backend::CrosstermBackend, Terminal};
 
 mod app;
+mod forge;
 mod input;
 mod instance;
 mod io;

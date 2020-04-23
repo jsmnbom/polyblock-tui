@@ -1,6 +1,11 @@
+use anyhow::Context;
 use data_encoding::HEXLOWER;
 use sha1::{Digest, Sha1};
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
+use tokio::io::AsyncWriteExt;
 use tui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
@@ -95,4 +100,17 @@ pub fn sha1_file<P: AsRef<Path>>(path: P) -> ::anyhow::Result<String> {
     std::io::copy(&mut file, &mut hasher)?;
     let result = hasher.result();
     Ok(HEXLOWER.encode(result.as_ref()))
+}
+
+pub async fn download_file<P: Into<PathBuf>>(url: &str, path: P) -> ::anyhow::Result<()> {
+    let path = path.into();
+    fs::create_dir_all(path.parent().unwrap()).context("Couldn't create parent folder.")?;
+    let mut file = tokio::fs::File::create(&path).await?;
+    let mut response = reqwest::get(url).await?.error_for_status()?;
+    while let Some(chunk) = response.chunk().await? {
+        file.write(&chunk).await?;
+    }
+    file.flush().await?;
+
+    Ok(())
 }

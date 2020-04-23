@@ -9,7 +9,7 @@ use tui::{
 };
 use unicode_width::UnicodeWidthStr;
 
-use crate::{minecraft, ui::RenderState, util, App, IoEvent, Key};
+use crate::{forge, minecraft, ui::RenderState, util, App, IoEvent, Key};
 
 #[derive(Clone)]
 pub enum InnerState {
@@ -25,10 +25,11 @@ pub enum InnerState {
 #[derive(Clone)]
 pub struct State {
     pub inner: InnerState,
-    name_input: String,
+    pub name_input: String,
     error: Option<String>,
     selected: usize,
-    chosen_minecraft_version: Option<minecraft::VersionManifestVersion>,
+    pub chosen_minecraft_version: Option<minecraft::VersionManifestVersion>,
+    pub chosen_forge_version: Option<forge::VersionManifestVersion>,
 }
 
 impl Default for State {
@@ -39,6 +40,7 @@ impl Default for State {
             error: None,
             selected: 0,
             chosen_minecraft_version: None,
+            chosen_forge_version: None,
         }
     }
 }
@@ -64,7 +66,14 @@ pub fn get_help(app: &App) -> Vec<(&'static str, &'static str)> {
             ("⏎", "select"),
             ("ESC", "cancel"),
         ],
-        _ => unimplemented!(),
+        InnerState::FetchForgeVersionManifest => Vec::new(),
+        InnerState::ChooseForgeVersion => vec![
+            ("↑↓", "choose version"),
+            ("PgUp/PgDn", "move cursor 25"),
+            ("⏎", "select"),
+            ("ESC", "cancel"),
+        ],
+        InnerState::Install => Vec::new(),
     }
 }
 
@@ -145,24 +154,92 @@ pub fn handle_key(key: Key, app: &mut App) {
             Key::Left => app.new_instance.selected = util::wrap_dec(app.new_instance.selected, 2),
             Key::Right => app.new_instance.selected = util::wrap_inc(app.new_instance.selected, 2),
             Key::Char('y') => {
+                app.dispatch(IoEvent::FetchForgeVersionManifest);
                 app.new_instance.inner = InnerState::FetchForgeVersionManifest;
                 app.new_instance.selected = 0;
             }
             Key::Char('n') => {
+                app.dispatch(IoEvent::CreateNewInstance);
                 app.new_instance.inner = InnerState::Install;
                 app.new_instance.selected = 0;
             }
             Key::Enter => {
                 if app.new_instance.selected == 0 {
+                    app.dispatch(IoEvent::FetchForgeVersionManifest);
                     app.new_instance.inner = InnerState::FetchForgeVersionManifest;
                 } else {
+                    app.dispatch(IoEvent::CreateNewInstance);
                     app.new_instance.inner = InnerState::Install;
                 }
                 app.new_instance.selected = 0;
             }
             _ => {}
         },
-        _ => unimplemented!(),
+        InnerState::FetchForgeVersionManifest => {}
+        InnerState::ChooseForgeVersion => {
+            let versions_len = app
+                .forge_version_manifest
+                .as_ref()
+                .unwrap()
+                .versions
+                .iter()
+                .filter(|version| {
+                    version.game_version
+                        == app
+                            .new_instance
+                            .chosen_minecraft_version
+                            .as_ref()
+                            .unwrap()
+                            .id
+                })
+                .count();
+            match key {
+                Key::Up => {
+                    app.new_instance.selected =
+                        util::wrap_dec(app.new_instance.selected, versions_len)
+                }
+                Key::Down => {
+                    app.new_instance.selected =
+                        util::wrap_inc(app.new_instance.selected, versions_len)
+                }
+                Key::PageUp => {
+                    app.new_instance.selected =
+                        util::wrap_sub(app.new_instance.selected, versions_len, 25)
+                }
+                Key::PageDown => {
+                    app.new_instance.selected =
+                        util::wrap_add(app.new_instance.selected, versions_len, 25)
+                }
+                Key::Enter => {
+                    app.new_instance.chosen_forge_version = Some(
+                        app.forge_version_manifest
+                            .as_ref()
+                            .unwrap()
+                            .versions
+                            .iter()
+                            .filter(|version| {
+                                version.game_version
+                                    == app
+                                        .new_instance
+                                        .chosen_minecraft_version
+                                        .as_ref()
+                                        .unwrap()
+                                        .id
+                            })
+                            .collect::<Vec<_>>()
+                            .get(app.new_instance.selected)
+                            .unwrap()
+                            .clone()
+                            .clone(),
+                    );
+                    app.dispatch(IoEvent::CreateNewInstance);
+                    app.new_instance.inner = InnerState::Install;
+                    app.new_instance.selected = 0;
+                }
+                _ => {}
+            }
+        }
+        InnerState::Install => {}
     }
 }
 
@@ -174,7 +251,11 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) -> RenderState
         }
         InnerState::ChooseMinecraftVersion => draw_choose_minecraft_version(f, app, chunk),
         InnerState::ChooseForge => draw_choose_forge(f, app, chunk),
-        _ => unimplemented!(),
+        InnerState::FetchForgeVersionManifest => {
+            draw_loading("Loading forge version manifest...", f, app, chunk)
+        }
+        InnerState::ChooseForgeVersion => draw_choose_forge_version(f, app, chunk),
+        InnerState::Install => draw_loading("Creating your new instance", f, app, chunk),
     }
 }
 
@@ -369,6 +450,87 @@ pub fn draw_choose_forge<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) -
         }),
         button_layout[3],
     );
+
+    RenderState::default()
+}
+
+pub fn draw_choose_forge_version<B: Backend>(
+    f: &mut Frame<B>,
+    app: &App,
+    chunk: Rect,
+) -> RenderState {
+    let rect = util::centered_rect_percentage(90, 75, chunk);
+
+    let versions = &(app.forge_version_manifest.as_ref().unwrap().versions);
+    // .iter()
+    // .filter(|version| match version.r#type {
+    //     minecraft::VersionManifestVersionType::Release => true,
+    //     minecraft::VersionManifestVersionType::Snapshot /* if snapshots */ => true,
+    //     minecraft::VersionManifestVersionType::OldBeta /* if historical */ => true,
+    //     minecraft::VersionManifestVersionType::OldAlpha /* if historical */ => true,
+    //     _ => false,
+    // })
+    // .collect::<Vec<_>>();
+
+    let offset = app
+        .new_instance
+        .selected
+        .saturating_sub((rect.height / 2) as usize)
+        .min(versions.len().saturating_sub((rect.height / 2) as usize));
+
+    let rows: Vec<_> = versions
+        .iter()
+        .filter(|version| {
+            version.game_version
+                == app
+                    .new_instance
+                    .chosen_minecraft_version
+                    .as_ref()
+                    .unwrap()
+                    .id
+        })
+        .skip(offset)
+        .take(rect.height as usize)
+        .map(|version| {
+            Row::Data(
+                vec![
+                    format!(
+                        "{}{}{}",
+                        version.name.trim_start_matches("forge-"),
+                        if version.latest { " (latest)" } else { "" },
+                        if version.recommended {
+                            " (recommended)"
+                        } else {
+                            ""
+                        }
+                    ),
+                    version.date_modified.format("%b %e %Y").to_string(),
+                ]
+                .into_iter(),
+            )
+        })
+        .collect();
+
+    let table = Table::new(["   Version id", "Release date"].iter(), rows.into_iter())
+        .block(
+            Block::default()
+                .title("Choose forge version")
+                .borders(Borders::ALL)
+                .border_type(BorderType::Plain),
+        )
+        .header_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD))
+        .widths(&[Constraint::Percentage(50), Constraint::Percentage(50)])
+        .style(Style::default())
+        .highlight_style(Style::default().fg(Color::Blue).modifier(Modifier::BOLD))
+        .highlight_symbol(">> ")
+        .column_spacing(1)
+        .header_gap(0);
+
+    let mut state = TableState::default();
+    state.select(Some(app.new_instance.selected - offset));
+
+    f.render_widget(Clear, rect);
+    f.render_stateful_widget(table, rect, &mut state);
 
     RenderState::default()
 }

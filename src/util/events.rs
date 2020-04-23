@@ -1,6 +1,5 @@
 /// https://github.com/Rigellute/spotify-tui/tree/master/src/event
 use crossterm::event;
-use log::trace;
 use std::{
     sync::mpsc,
     thread,
