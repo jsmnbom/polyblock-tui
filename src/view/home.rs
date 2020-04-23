@@ -73,9 +73,9 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) -> RenderState
     )
     .block(
         Block::default()
-            .title("Choose instance")
+            .title("Polyblock - choose instance")
             .borders(Borders::ALL)
-            .border_type(BorderType::Thick),
+            .border_type(BorderType::Plain),
     )
     .header_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD))
     .widths(&[

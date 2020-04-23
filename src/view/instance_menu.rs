@@ -101,7 +101,7 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) -> RenderState
             Block::default()
                 .title(instance_name)
                 .borders(Borders::ALL)
-                .border_type(BorderType::Double),
+                .border_type(BorderType::Plain),
         )
         .style(Style::default())
         .highlight_style(Style::default().fg(Color::Blue).modifier(Modifier::BOLD))

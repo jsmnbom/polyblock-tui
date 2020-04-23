@@ -148,7 +148,7 @@ fn draw_enter_name<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) -> Rend
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .border_type(BorderType::Double)
+                .border_type(BorderType::Plain)
                 .title("Enter new instance name"),
         );
 
@@ -178,7 +178,7 @@ fn draw_loading<B: Backend>(msg: &str, f: &mut Frame<B>, _app: &App, chunk: Rect
         .block(
             Block::default()
                 .borders(Borders::ALL)
-                .border_type(BorderType::Double),
+                .border_type(BorderType::Plain),
         );
 
     f.render_widget(Clear, rect);
@@ -235,7 +235,7 @@ pub fn draw_choose_minecraft_version<'a, B: Backend>(
         Block::default()
             .title("Choose minecraft version")
             .borders(Borders::ALL)
-            .border_type(BorderType::Double),
+            .border_type(BorderType::Plain),
     )
     .header_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD))
     .widths(&[
