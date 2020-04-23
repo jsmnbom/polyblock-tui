@@ -1,6 +1,11 @@
 /// https://github.com/Rigellute/spotify-tui/tree/master/src/event
 use crossterm::event;
-use std::{sync::mpsc, thread, time::Duration};
+use log::trace;
+use std::{
+    sync::mpsc,
+    thread,
+    time::{Duration, Instant},
+};
 
 /// Represents an key.
 #[derive(PartialEq, Eq, Clone, Copy, Hash, Debug)]
@@ -186,14 +191,16 @@ pub struct EventConfig {
     /// The key that is used to exit the application.
     pub exit_key: Key,
     /// The tick rate at which the application will sent an tick event.
-    pub tick_rate: Duration,
+    pub tick_rate_min: Duration,
+    pub tick_rate_max: Duration,
 }
 
 impl Default for EventConfig {
     fn default() -> EventConfig {
         EventConfig {
             exit_key: Key::Ctrl('c'),
-            tick_rate: Duration::from_millis(250),
+            tick_rate_min: Duration::from_millis(25),
+            tick_rate_max: Duration::from_millis(250),
         }
     }
 }
@@ -216,9 +223,10 @@ pub struct Events {
 
 impl Events {
     /// Constructs an new instance of `Events` with the default config.
-    pub fn new(tick_rate: u64) -> Events {
+    pub fn new(tick_rate_min: u64, tick_rate_max: u64) -> Events {
         Events::with_config(EventConfig {
-            tick_rate: Duration::from_millis(tick_rate),
+            tick_rate_min: Duration::from_millis(tick_rate_min),
+            tick_rate_max: Duration::from_millis(tick_rate_max),
             ..Default::default()
         })
     }
@@ -229,17 +237,30 @@ impl Events {
 
         let event_tx = tx.clone();
         thread::spawn(move || {
+            let mut last_tick = Instant::now();
+            let mut key_sent = false;
             loop {
                 // poll for tick rate duration, if no event, sent tick event.
-                if event::poll(config.tick_rate).unwrap() {
+                if event::poll(config.tick_rate_min).unwrap() {
                     if let event::Event::Key(key) = event::read().unwrap() {
+                        // trace!("Got key: {:?}", key);
                         let key = Key::from(key);
 
                         event_tx.send(Event::Input(key)).unwrap();
+                        key_sent = true;
                     }
                 }
-
-                event_tx.send(Event::Tick).unwrap();
+                if last_tick.elapsed() > config.tick_rate_min && key_sent {
+                    // trace!("Over min tick rate - sending tick");
+                    event_tx.send(Event::Tick).unwrap();
+                    last_tick = Instant::now();
+                    key_sent = false;
+                }
+                if last_tick.elapsed() > config.tick_rate_max {
+                    // trace!("Over max tick rate - sending tick");
+                    event_tx.send(Event::Tick).unwrap();
+                    last_tick = Instant::now();
+                }
             }
         });
 
