@@ -6,23 +6,23 @@ pub use manifest::{VersionManifest, VersionManifestVersion, VersionManifestVersi
 
 pub fn version_ident(version: &VersionManifestVersion) -> &'static str {
     if version.id == "3D Shareware v1.34" {
-        "(April Fools' joke)"
+        "April Fools' joke"
     } else if version.id == "20w14infinite" {
-        "(April Fools' joke)"
+        "April Fools' joke"
     } else if version.id.starts_with("rd") {
-        "(pre-classic)"
+        "Pre-classic"
     } else if version.id.starts_with("c") {
-        "(classic)"
+        "Classic"
     } else if version.id.starts_with("inf") {
-        "(infdev)"
+        "Infdev"
     } else if version.id.starts_with("a") {
-        "(alpha)"
+        "Alpha"
     } else if version.id.starts_with("b") {
-        "(beta)"
+        "Beta"
     } else if version.r#type == VersionManifestVersionType::Snapshot {
-        "(snapshot)"
+        "Snapshot"
     } else if version.r#type == VersionManifestVersionType::Release {
-        "(release)"
+        "Release"
     } else {
         ""
     }
