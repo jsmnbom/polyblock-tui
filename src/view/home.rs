@@ -1,12 +1,13 @@
 use tui::{
-    backend::Backend,
     layout::{Constraint, Rect},
     style::{Color, Modifier, Style},
     widgets::{Block, BorderType, Borders, Row, Table, TableState},
-    Frame,
 };
 
-use crate::{ui::RenderState, util, App, Key, RouteId};
+use crate::{
+    ui::{RenderState, UiFrame},
+    util, App, Key, RouteId,
+};
 
 #[derive(Default)]
 pub struct State {
@@ -42,7 +43,7 @@ pub fn handle_key(key: Key, app: &mut App) {
     }
 }
 
-pub fn draw<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) -> RenderState {
+pub fn draw(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
     let rows: Vec<_> = app
         .instances
         .inner

@@ -1,15 +1,18 @@
 use crossterm::{cursor::MoveTo, execute};
+use log::debug;
 use std::io::{self, Write};
 use tui::{
-    backend::Backend,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, BorderType, Borders, Clear, Paragraph, Row, Table, TableState, Text},
-    Frame,
+    widgets::{Block, BorderType, Borders, Clear, Gauge, Paragraph, Row, Table, TableState, Text},
 };
 use unicode_width::UnicodeWidthStr;
 
-use crate::{forge, minecraft, ui::RenderState, util, App, IoEvent, Key};
+use crate::{
+    forge, minecraft,
+    ui::{RenderState, UiFrame},
+    util, App, IoEvent, Key,
+};
 
 #[derive(Clone)]
 pub enum InnerState {
@@ -30,6 +33,8 @@ pub struct State {
     selected: usize,
     pub chosen_minecraft_version: Option<minecraft::VersionManifestVersion>,
     pub chosen_forge_version: Option<forge::VersionManifestVersion>,
+    pub progress_main: util::Progress,
+    pub progress_sub: util::Progress,
 }
 
 impl Default for State {
@@ -41,6 +46,8 @@ impl Default for State {
             selected: 0,
             chosen_minecraft_version: None,
             chosen_forge_version: None,
+            progress_main: util::Progress::new(),
+            progress_sub: util::Progress::new(),
         }
     }
 }
@@ -243,23 +250,37 @@ pub fn handle_key(key: Key, app: &mut App) {
     }
 }
 
-pub fn draw<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) -> RenderState {
+pub async fn draw(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
     match &app.new_instance.inner {
         InnerState::EnterName => draw_enter_name(f, app, chunk),
         InnerState::FetchMinecraftVersionManifest => {
-            draw_loading("Loading minecraft version manifest...", f, app, chunk)
+            app.new_instance
+                .progress_main
+                .set_msg("Loading minecraft version manifest...")
+                .await;
+            draw_loading(f, app, chunk).await
         }
         InnerState::ChooseMinecraftVersion => draw_choose_minecraft_version(f, app, chunk),
         InnerState::ChooseForge => draw_choose_forge(f, app, chunk),
         InnerState::FetchForgeVersionManifest => {
-            draw_loading("Loading forge version manifest...", f, app, chunk)
+            app.new_instance
+                .progress_main
+                .set_msg("Loading forge version manifest...")
+                .await;
+            draw_loading(f, app, chunk).await
         }
         InnerState::ChooseForgeVersion => draw_choose_forge_version(f, app, chunk),
-        InnerState::Install => draw_loading("Creating your new instance", f, app, chunk),
+        InnerState::Install => {
+            app.new_instance
+                .progress_main
+                .set_msg("Creating your new instance")
+                .await;
+            draw_loading(f, app, chunk).await
+        }
     }
 }
 
-fn draw_enter_name<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) -> RenderState {
+fn draw_enter_name(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
     let state = &app.new_instance;
 
     let mut rect = util::centered_rect_percentage_dir(Direction::Horizontal, 30, chunk);
@@ -295,29 +316,56 @@ fn draw_enter_name<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) -> Rend
     RenderState::default().show_cursor()
 }
 
-fn draw_loading<B: Backend>(msg: &str, f: &mut Frame<B>, _app: &App, chunk: Rect) -> RenderState {
-    let rect = util::centered_rect(3, msg.width() as u16 + 2, chunk);
+async fn draw_loading(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
+    debug!("About to draw loading");
+    let rect = util::centered_rect_percentage_dir(Direction::Horizontal, 50, chunk);
+    debug!("rect1 {:?}", rect);
+    let rect = util::centered_rect_dir(Direction::Vertical, 7, rect);
+    debug!("rect2 {:?}", rect);
 
-    let text = vec![Text::raw(msg)];
-    let input = Paragraph::new(text.iter())
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(
+            [
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(1),
+            ]
+            .as_ref(),
+        )
+        .margin(2)
+        .split(rect);
+
+    let block_widget = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Plain);
+
+    let text = vec![Text::raw(app.new_instance.progress_main.get_msg().await)];
+    let text_widget = Paragraph::new(text.iter())
         .style(Style::default().fg(Color::Yellow))
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Plain),
-        );
+        .alignment(Alignment::Center);
+
+    let ratio = app.new_instance.progress_main.get().await;
+    let label = format!("{:0}%", (ratio * 100.0));
+    let gauge_widget = Gauge::default()
+        .style(
+            Style::default()
+                .fg(Color::White)
+                .bg(Color::Black)
+                .modifier(Modifier::ITALIC),
+        )
+        .label(&label)
+        .ratio(ratio);
 
     f.render_widget(Clear, rect);
-    f.render_widget(input, rect);
+    f.render_widget(block_widget, rect);
+    f.render_widget(text_widget, layout[0]);
+    f.render_widget(gauge_widget, layout[2]);
 
     RenderState::default()
 }
 
-pub fn draw_choose_minecraft_version<'a, B: Backend>(
-    f: &mut Frame<B>,
-    app: &App,
-    chunk: Rect,
-) -> RenderState {
+pub fn draw_choose_minecraft_version(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
     let rect = util::centered_rect_percentage(90, 75, chunk);
 
     let versions = &(app.minecraft_version_manifest.as_ref().unwrap().versions);
@@ -384,7 +432,7 @@ pub fn draw_choose_minecraft_version<'a, B: Backend>(
     RenderState::default()
 }
 
-pub fn draw_choose_forge<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) -> RenderState {
+pub fn draw_choose_forge(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
     let mut rect = util::centered_rect_percentage_dir(Direction::Horizontal, 60, chunk);
     rect.y = (rect.height / 2) - 5;
     rect.height = 10;
@@ -454,11 +502,7 @@ pub fn draw_choose_forge<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) -
     RenderState::default()
 }
 
-pub fn draw_choose_forge_version<B: Backend>(
-    f: &mut Frame<B>,
-    app: &App,
-    chunk: Rect,
-) -> RenderState {
+pub fn draw_choose_forge_version(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
     let rect = util::centered_rect_percentage(90, 75, chunk);
 
     let versions = &(app.forge_version_manifest.as_ref().unwrap().versions);

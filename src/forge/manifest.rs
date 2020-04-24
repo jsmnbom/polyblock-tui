@@ -9,7 +9,7 @@ use std::{
     path::PathBuf,
 };
 
-use crate::minecraft;
+use crate::{minecraft, util};
 
 pub const URL: &str = "https://addons-ecs.forgesvc.net/api/v2/minecraft/modloader";
 
@@ -33,10 +33,14 @@ pub struct VersionManifest {
 
 impl VersionManifest {
     pub async fn fetch(
+        pb: &util::Progress,
         client: &reqwest::Client,
         data_file_path: &PathBuf,
     ) -> ::anyhow::Result<Self> {
         // TODO: If less than 15 min since cache was saved, don't even bother the server at all
+
+        // the endpoint provides no content-length data so a proper progress bar here is near impossible
+        pb.set_length(5).await;
 
         let cached_data = match fs::File::open(data_file_path) {
             Ok(file) => {
@@ -51,6 +55,8 @@ impl VersionManifest {
             }
         };
 
+        pb.inc(1).await;
+
         let mut current_timestamp: Option<DateTime<Utc>> = None;
 
         if let Some(data) = cached_data {
@@ -61,16 +67,23 @@ impl VersionManifest {
             }
         }
 
+        pb.inc(1).await;
+
         let response = client
             .get(URL)
             .send()
             .await
             .context("Failed to get forge version manifest.")?
             .error_for_status()?;
+
+        pb.inc(1).await;
+
         let versions: Vec<VersionManifestVersion> = response
             .json()
             .await
             .context("Failed to decode forge version manifest.")?;
+
+        pb.inc(1).await;
 
         if current_timestamp.is_none() {
             current_timestamp = Some(Self::fetch_timestamp(&client).await?);
@@ -87,6 +100,8 @@ impl VersionManifest {
                 .context("Failed to create forge version manifest cache.")?,
         );
         serde_json::to_writer(writer, &data)?;
+
+        pb.inc(1).await;
 
         Ok(data)
     }

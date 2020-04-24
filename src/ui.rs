@@ -1,7 +1,7 @@
 use log::trace;
-use std::time::Instant;
+use std::{io::Stdout, time::Instant};
 use tui::{
-    backend::Backend,
+    backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     widgets::{Paragraph, Text},
@@ -9,6 +9,8 @@ use tui::{
 };
 
 use crate::{view, App, RouteId};
+
+pub type UiFrame<'a> = Frame<'a, CrosstermBackend<Stdout>>;
 
 pub struct RenderState {
     hide_cursor: bool,
@@ -27,7 +29,7 @@ impl RenderState {
     }
 }
 
-pub fn draw_layout<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+pub async fn draw_layout(f: &mut UiFrame<'_>, app: &mut App) {
     let instant = Instant::now();
     let routes = app.get_current_routes();
 
@@ -60,17 +62,15 @@ pub fn draw_layout<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         parent_layout[1],
     );
 
-    let render_states: Vec<RenderState> = routes
-        .iter()
-        .map(|route| match route.id {
+    let mut render_state = None;
+    for route in routes.iter() {
+        render_state = Some(match route.id {
             RouteId::Home => view::home::draw(f, app, parent_layout[0]),
             RouteId::InstanceMenu => view::instance_menu::draw(f, app, parent_layout[0]),
-            RouteId::NewInstance => view::new_instance::draw(f, app, parent_layout[0]),
-        })
-        .collect();
-
-    let last_render_state = render_states.last().unwrap();
-    app.hide_cursor = last_render_state.hide_cursor;
+            RouteId::NewInstance => view::new_instance::draw(f, app, parent_layout[0]).await,
+        });
+    }
+    app.hide_cursor = render_state.unwrap().hide_cursor;
 
     trace!("Drawing took {:?}", instant.elapsed());
 }

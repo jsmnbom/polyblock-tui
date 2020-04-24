@@ -1,13 +1,14 @@
 use std::fmt;
 use tui::{
-    backend::Backend,
     layout::Rect,
     style::{Color, Modifier, Style},
     widgets::{Block, BorderType, Borders, Clear, List, ListState, Text},
-    Frame,
 };
 
-use crate::{ui::RenderState, util, App, Key};
+use crate::{
+    ui::{RenderState, UiFrame},
+    util, App, Key,
+};
 
 pub enum Option {
     Play,
@@ -89,7 +90,7 @@ pub fn handle_key(key: Key, app: &mut App) {
     }
 }
 
-pub fn draw<B: Backend>(f: &mut Frame<B>, app: &App, chunk: Rect) -> RenderState {
+pub fn draw(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
     let state = &app.instance_menu;
 
     let instance_name = &state.instance_name;

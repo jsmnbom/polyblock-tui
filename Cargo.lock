@@ -1164,6 +1164,7 @@ dependencies = [
  "anyhow",
  "array_tool",
  "better-panic",
+ "bytes",
  "chrono",
  "crossterm",
  "data-encoding",

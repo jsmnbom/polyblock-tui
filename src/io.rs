@@ -29,13 +29,18 @@ impl<'a> Io<'a> {
         match io_event {
             FetchMinecraftVersionManifest => {
                 if self.app.lock().await.minecraft_version_manifest.is_none() {
-                    let data_file_path = {
+                    let (data_file_path, pb) = {
                         let app = self.app.lock().await;
-                        app.paths.file.minecraft_versions_cache.clone()
+                        (
+                            app.paths.file.minecraft_versions_cache.clone(),
+                            app.new_instance.progress_main.clone(),
+                        )
                     };
+                    pb.reset().await;
 
                     let manifest =
-                        minecraft::VersionManifest::fetch(&self.client, &data_file_path).await?;
+                        minecraft::VersionManifest::fetch(&pb, &self.client, &data_file_path)
+                            .await?;
 
                     self.app.lock().await.minecraft_version_manifest = Some(manifest);
                 }
@@ -44,13 +49,17 @@ impl<'a> Io<'a> {
             }
             FetchForgeVersionManifest => {
                 if self.app.lock().await.forge_version_manifest.is_none() {
-                    let data_file_path = {
+                    let (data_file_path, pb) = {
                         let app = self.app.lock().await;
-                        app.paths.file.forge_versions_cache.clone()
+                        (
+                            app.paths.file.forge_versions_cache.clone(),
+                            app.new_instance.progress_main.clone(),
+                        )
                     };
+                    pb.reset().await;
 
                     let manifest =
-                        forge::VersionManifest::fetch(&self.client, &data_file_path).await?;
+                        forge::VersionManifest::fetch(&pb, &self.client, &data_file_path).await?;
                     self.app.lock().await.forge_version_manifest = Some(manifest);
                 }
                 self.app.lock().await.new_instance.inner =

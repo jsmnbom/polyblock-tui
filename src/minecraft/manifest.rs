@@ -1,4 +1,5 @@
 use anyhow::Context;
+use bytes::BytesMut;
 use chrono::{DateTime, Utc};
 use log::debug;
 use reqwest;
@@ -9,6 +10,8 @@ use std::{
     io::{BufReader, BufWriter},
     path::PathBuf,
 };
+
+use crate::util;
 
 const URL: &'static str = "https://launchermeta.mojang.com/mc/game/version_manifest.json";
 
@@ -53,6 +56,7 @@ pub struct Data {
 
 impl VersionManifest {
     pub async fn fetch(
+        pb: &util::Progress,
         client: &reqwest::Client,
         data_file_path: &PathBuf,
     ) -> ::anyhow::Result<Self> {
@@ -75,11 +79,17 @@ impl VersionManifest {
         if let Some(data) = cached_data.clone() {
             builder = builder.header(reqwest::header::IF_NONE_MATCH, data.etag)
         }
-        let response = builder
+        let mut response = builder
             .send()
             .await
             .context("Failed to get minecraft version manifest.")?
             .error_for_status()?;
+
+        let content_length = response.content_length();
+
+        if let Some(content_length) = content_length {
+            pb.set_length(content_length).await;
+        }
 
         let etag: Option<String> = response
             .headers()
@@ -92,10 +102,19 @@ impl VersionManifest {
                 debug!("Not modified - cache hit.");
                 cached_data.clone().unwrap().manifest
             }
-            _ => response
-                .json()
-                .await
-                .context("Failed to decode minecraft version manifest.")?,
+            _ => {
+                let mut buf = match content_length {
+                    Some(content_length) => BytesMut::with_capacity(content_length as usize),
+                    None => BytesMut::new(),
+                };
+                while let Some(chunk) = response.chunk().await? {
+                    buf.extend_from_slice(&chunk);
+                    pb.inc(chunk.len() as u64).await;
+                }
+
+                serde_json::from_slice(&buf)
+                    .context("Failed to decode minecraft version manifest.")?
+            }
         };
 
         if cached_data.is_none()

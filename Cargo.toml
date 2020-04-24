@@ -31,6 +31,7 @@ notify = "4.0.15"
 env_logger = "0.7.1"
 futures = "0.3.4"
 better-panic = "0.2.0"
+bytes = "0.5.4"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winreg = "0.7"

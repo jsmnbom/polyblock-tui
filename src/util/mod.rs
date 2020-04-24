@@ -14,8 +14,10 @@ use tui::{
 
 mod events;
 pub mod java;
+mod progress;
 
 pub use events::{Event, Events, Key};
+pub use progress::Progress;
 
 pub fn wrap_dec(cur: usize, max: usize) -> usize {
     wrap_sub(cur, max, 1)
@@ -51,6 +53,23 @@ pub fn centered_rect(height: u16, width: u16, r: Rect) -> Rect {
         width,
         x: (r.width - width) / 2,
         y: (r.height - height) / 2,
+    }
+}
+
+pub fn centered_rect_dir(direction: Direction, height_or_width: u16, r: Rect) -> Rect {
+    match direction {
+        Direction::Horizontal => Rect {
+            height: r.height,
+            width: height_or_width,
+            x: (r.width - height_or_width) / 2,
+            y: r.y,
+        },
+        Direction::Vertical => Rect {
+            height: height_or_width,
+            width: r.width,
+            x: r.x,
+            y: (r.height - height_or_width) / 2,
+        },
     }
 }
 
@@ -112,5 +131,28 @@ pub async fn download_file<P: Into<PathBuf>>(url: &str, path: P) -> ::anyhow::Re
     }
     file.flush().await?;
 
+    Ok(())
+}
+
+pub async fn download_file_with_progress<P: Into<PathBuf>>(
+    pb: &Progress,
+    url: &str,
+    path: P,
+) -> ::anyhow::Result<()> {
+    let path = path.into();
+    fs::create_dir_all(path.parent().unwrap()).context("Couldn't create parent folder.")?;
+    let mut file = tokio::fs::File::create(&path).await?;
+    let mut response = reqwest::get(url).await?.error_for_status()?;
+    let content_length = response.content_length();
+
+    if let Some(content_length) = content_length {
+        pb.set_length(content_length);
+    }
+
+    while let Some(chunk) = response.chunk().await? {
+        let written = file.write(&chunk).await?;
+        pb.inc(written as u64);
+    }
+    file.flush().await?;
     Ok(())
 }

@@ -121,7 +121,11 @@ async fn main() -> ::anyhow::Result<()> {
     loop {
         let mut app = cloned_app.lock().await;
 
-        terminal.draw(|mut f| ui::draw_layout(&mut f, &mut app))?;
+        // Replicate start of terminal.draw so we can draw async
+        terminal.autoresize()?;
+        let mut frame = terminal.get_frame();
+        ui::draw_layout(&mut frame, &mut app).await;
+        terminal.draw(|_| {})?;
 
         #[allow(irrefutable_let_patterns)]
         while let event = events.next()? {
