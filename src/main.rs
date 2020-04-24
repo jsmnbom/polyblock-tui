@@ -1,18 +1,17 @@
-use backtrace::Backtrace;
 use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture},
-    execute,
-    style::Print,
+    cursor, execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use std::{
     io::{stdout, Write},
-    panic::{self, PanicInfo},
+    panic,
     path::PathBuf,
+    process,
     sync::{
         mpsc::{channel, Receiver},
         Arc,
     },
+    thread,
 };
 use structopt::StructOpt;
 use tokio::sync::Mutex;
@@ -36,31 +35,9 @@ use io::{Io, IoEvent};
 use paths::Paths;
 use util::{Event, Events, Key};
 
-// https://github.com/Rigellute/spotify-tui/blob/master/src/main.rs#L91
-fn panic_hook(info: &PanicInfo<'_>) {
-    let location = info.location().unwrap();
-
-    let msg = match info.payload().downcast_ref::<&'static str>() {
-        Some(s) => *s,
-        None => match info.payload().downcast_ref::<String>() {
-            Some(s) => &s[..],
-            None => "Box<Any>",
-        },
-    };
-
-    let stacktrace: String = format!("{:?}", Backtrace::new()).replace('\n', "\n\r");
-
+fn cleanup_terminal() {
     disable_raw_mode().unwrap();
-    execute!(
-        stdout(),
-        LeaveAlternateScreen,
-        Print(format!(
-            "thread '<unnamed>' panicked at '{}', {}\n\r{}",
-            msg, location, stacktrace
-        )),
-        DisableMouseCapture
-    )
-    .unwrap();
+    execute!(stdout(), LeaveAlternateScreen, cursor::Show).unwrap();
 }
 
 #[derive(StructOpt, Debug)]
@@ -102,20 +79,26 @@ pub struct Opt {
 #[tokio::main]
 async fn main() -> ::anyhow::Result<()> {
     panic::set_hook(Box::new(|info| {
-        panic_hook(info);
+        cleanup_terminal();
+        better_panic::Settings::auto()
+            .most_recent_first(false)
+            .lineno_suffix(true)
+            .create_panic_handler()(info);
+        // Could be a panic from another thread - make sure we exit
+        process::exit(1);
     }));
 
     env_logger::init();
 
     let opt = Opt::from_args();
 
-    execute!(stdout(), EnterAlternateScreen, EnableMouseCapture)?;
+    execute!(stdout(), EnterAlternateScreen)?;
     enable_raw_mode()?;
 
     let backend = CrosstermBackend::new(stdout());
     let mut terminal = Terminal::new(backend)?;
 
-    let events = Events::new(25, 250);
+    let events = Events::new(25, 250)?;
 
     let (io_tx, io_rx) = channel::<IoEvent>();
 
@@ -130,10 +113,10 @@ async fn main() -> ::anyhow::Result<()> {
             env!("CARGO_PKG_VERSION")
         ))
         .build()?;
-    std::thread::spawn(move || {
+    thread::Builder::new().name("io".into()).spawn(move || {
         let mut io = Io::new(&app, reqwest_client);
         io_inner(io_rx, &mut io);
-    });
+    })?;
 
     loop {
         let mut app = cloned_app.lock().await;
@@ -166,9 +149,7 @@ async fn main() -> ::anyhow::Result<()> {
         }
     }
 
-    terminal.show_cursor()?;
-    disable_raw_mode()?;
-    execute!(stdout(), LeaveAlternateScreen, DisableMouseCapture)?;
+    cleanup_terminal();
 
     Ok(())
 }

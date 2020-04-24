@@ -12,7 +12,6 @@ anyhow = "1.0.28"
 crossterm = "0.17"
 structopt = "0.3.13"
 directories = "2.0.2"
-backtrace = "0.3.46"
 tokio = { version = "0.2.18", features = ["full"] }
 lazy_static = "1.4.0"
 which = { version = "3.1.1", default-features = false }
@@ -31,6 +30,7 @@ data-encoding = "2.2.0"
 notify = "4.0.15"
 env_logger = "0.7.1"
 futures = "0.3.4"
+better-panic = "0.2.0"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winreg = "0.7"

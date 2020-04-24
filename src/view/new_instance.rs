@@ -462,15 +462,6 @@ pub fn draw_choose_forge_version<B: Backend>(
     let rect = util::centered_rect_percentage(90, 75, chunk);
 
     let versions = &(app.forge_version_manifest.as_ref().unwrap().versions);
-    // .iter()
-    // .filter(|version| match version.r#type {
-    //     minecraft::VersionManifestVersionType::Release => true,
-    //     minecraft::VersionManifestVersionType::Snapshot /* if snapshots */ => true,
-    //     minecraft::VersionManifestVersionType::OldBeta /* if historical */ => true,
-    //     minecraft::VersionManifestVersionType::OldAlpha /* if historical */ => true,
-    //     _ => false,
-    // })
-    // .collect::<Vec<_>>();
 
     let offset = app
         .new_instance

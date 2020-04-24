@@ -1,4 +1,5 @@
-/// https://github.com/Rigellute/spotify-tui/tree/master/src/event
+/// Adapted from https://github.com/Rigellute/spotify-tui/tree/master/src/event
+/// Only change is variable tick rate
 use crossterm::event;
 use std::{
     sync::mpsc,
@@ -222,7 +223,7 @@ pub struct Events {
 
 impl Events {
     /// Constructs an new instance of `Events` with the default config.
-    pub fn new(tick_rate_min: u64, tick_rate_max: u64) -> Events {
+    pub fn new(tick_rate_min: u64, tick_rate_max: u64) -> ::anyhow::Result<Events> {
         Events::with_config(EventConfig {
             tick_rate_min: Duration::from_millis(tick_rate_min),
             tick_rate_max: Duration::from_millis(tick_rate_max),
@@ -231,11 +232,11 @@ impl Events {
     }
 
     /// Constructs an new instance of `Events` from given config.
-    pub fn with_config(config: EventConfig) -> Events {
+    pub fn with_config(config: EventConfig) -> ::anyhow::Result<Events> {
         let (tx, rx) = mpsc::channel();
 
         let event_tx = tx.clone();
-        thread::spawn(move || {
+        thread::Builder::new().name("events".into()).spawn(move || {
             let mut last_tick = Instant::now();
             let mut key_sent = false;
             loop {
@@ -261,9 +262,9 @@ impl Events {
                     last_tick = Instant::now();
                 }
             }
-        });
+        })?;
 
-        Events { rx, _tx: tx }
+        Ok(Events { rx, _tx: tx })
     }
 
     /// Attempts to read an event.
