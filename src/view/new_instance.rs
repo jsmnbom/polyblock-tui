@@ -527,7 +527,7 @@ https://www.patreon.com/LexManos";
 
 pub fn draw_choose_forge(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
     let rect = util::centered_rect_percentage_dir(Direction::Horizontal, 60, chunk);
-    let rect = util::centered_rect_dir(Direction::Horizontal, 10, rect);
+    let rect = util::centered_rect_dir(Direction::Vertical, 10, rect);
 
     f.render_widget(Clear, rect);
     f.render_widget(
@@ -557,7 +557,7 @@ pub fn draw_choose_forge(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderS
             .alignment(Alignment::Center)
             .style(Style::default().fg(Color::Yellow))
             .wrap(true),
-        layout[1],
+        layout[0],
     );
 
     let button_layout = Layout::default()
