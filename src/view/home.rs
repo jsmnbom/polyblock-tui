@@ -97,33 +97,35 @@ pub fn draw(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
         })
         .collect();
 
-    let table = Table::new(
-        ["   Name", "Minecraft version", "Modloader", "Mods"].iter(),
-        rows.into_iter(),
-    )
-    .block(
-        Block::default()
-            .title("Polyblock - choose instance")
-            .borders(Borders::ALL)
-            .border_type(BorderType::Plain),
-    )
-    .header_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD))
-    .widths(&[
-        Constraint::Percentage(40),
-        Constraint::Percentage(20),
-        Constraint::Percentage(20),
-        Constraint::Percentage(20),
-    ])
-    .style(Style::default())
-    .highlight_style(Style::default().fg(Color::Blue).modifier(Modifier::BOLD))
-    .highlight_symbol(">> ")
-    .column_spacing(1)
-    .header_gap(0);
-
     let mut state = TableState::default();
     state.select(Some(app.home.selected));
 
-    f.render_stateful_widget(table, chunk, &mut state);
+    f.render_stateful_widget(
+        Table::new(
+            ["   Name", "Minecraft version", "Modloader", "Mods"].iter(),
+            rows.into_iter(),
+        )
+        .block(
+            Block::default()
+                .title("Polyblock - choose instance")
+                .borders(Borders::ALL)
+                .border_type(BorderType::Plain),
+        )
+        .header_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD))
+        .widths(&[
+            Constraint::Percentage(40),
+            Constraint::Percentage(20),
+            Constraint::Percentage(20),
+            Constraint::Percentage(20),
+        ])
+        .style(Style::default())
+        .highlight_style(Style::default().fg(Color::Blue).modifier(Modifier::BOLD))
+        .highlight_symbol(">> ")
+        .column_spacing(1)
+        .header_gap(0),
+        chunk,
+        &mut state,
+    );
 
     RenderState::default()
 }

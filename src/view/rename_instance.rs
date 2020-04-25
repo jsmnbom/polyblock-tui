@@ -1,8 +1,8 @@
 use crossterm::{cursor::MoveTo, execute};
 use std::io::{self, Write};
 use tui::{
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    layout::{Direction, Rect},
+    style::{Color, Style},
     widgets::{Block, BorderType, Borders, Clear, Paragraph, Text},
 };
 use unicode_width::UnicodeWidthStr;
@@ -70,23 +70,31 @@ pub fn handle_key(key: Key, app: &mut App) {
 pub fn draw(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
     let state = &app.rename_instance;
 
-    let mut rect = util::centered_rect_percentage_dir(Direction::Horizontal, 30, chunk);
-    rect.y = (rect.height / 2) - 2;
-    rect.height = if state.error.is_some() { 4 } else { 3 };
+    let rect = util::centered_rect_percentage_dir(Direction::Horizontal, 30, chunk);
+    let rect = util::centered_rect_dir(
+        Direction::Vertical,
+        if state.error.is_some() { 4 } else { 3 },
+        rect,
+    );
+    f.render_widget(Clear, rect);
 
     let mut text = vec![Text::raw(&state.name_input)];
     if let Some(error) = &state.error {
         text.push(Text::raw("\n\r"));
         text.push(Text::styled(error, Style::default().fg(Color::Red)));
     }
-    let input = Paragraph::new(text.iter())
-        .style(Style::default().fg(Color::Yellow))
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Plain)
-                .title("Enter new instance name"),
-        );
+
+    f.render_widget(
+        Paragraph::new(text.iter())
+            .style(Style::default().fg(Color::Yellow))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Plain)
+                    .title("Enter new instance name"),
+            ),
+        rect,
+    );
 
     execute!(
         io::stdout(),
@@ -96,9 +104,6 @@ pub fn draw(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
         )
     )
     .ok();
-
-    f.render_widget(Clear, rect);
-    f.render_widget(input, rect);
 
     RenderState::default().show_cursor()
 }

@@ -280,23 +280,31 @@ pub async fn draw(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
 fn draw_enter_name(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
     let state = &app.new_instance;
 
-    let mut rect = util::centered_rect_percentage_dir(Direction::Horizontal, 30, chunk);
-    rect.y = (rect.height / 2) - 2;
-    rect.height = if state.error.is_some() { 4 } else { 3 };
+    let rect = util::centered_rect_percentage_dir(Direction::Horizontal, 30, chunk);
+    let rect = util::centered_rect_dir(
+        Direction::Vertical,
+        if state.error.is_some() { 4 } else { 3 },
+        rect,
+    );
+    f.render_widget(Clear, rect);
 
     let mut text = vec![Text::raw(&state.name_input)];
     if let Some(error) = &state.error {
         text.push(Text::raw("\n\r"));
         text.push(Text::styled(error, Style::default().fg(Color::Red)));
     }
-    let input = Paragraph::new(text.iter())
-        .style(Style::default().fg(Color::Yellow))
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Plain)
-                .title("Enter new instance name"),
-        );
+
+    f.render_widget(
+        Paragraph::new(text.iter())
+            .style(Style::default().fg(Color::Yellow))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Plain)
+                    .title("Enter new instance name"),
+            ),
+        rect,
+    );
 
     execute!(
         io::stdout(),
@@ -307,14 +315,10 @@ fn draw_enter_name(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
     )
     .ok();
 
-    f.render_widget(Clear, rect);
-    f.render_widget(input, rect);
-
     RenderState::default().show_cursor()
 }
 
 async fn draw_loading(f: &mut UiFrame<'_>, app: &App, chunk: Rect, msg: &str) -> RenderState {
-    debug!("About to draw loading");
     let rect = util::centered_rect_percentage_dir(Direction::Horizontal, 50, chunk);
     let mut height: u16 = 5;
     let mut to_draw: Vec<(f64, String)> = Vec::new();
@@ -333,8 +337,7 @@ async fn draw_loading(f: &mut UiFrame<'_>, app: &App, chunk: Rect, msg: &str) ->
             to_draw.push((ratio, msg));
         };
     }
-    debug!("To draw: {:?}", to_draw);
-    debug!("Height: {:?}", height);
+
     let rect = util::centered_rect_dir(Direction::Vertical, height, rect);
     f.render_widget(Clear, rect);
     f.render_widget(
@@ -353,8 +356,6 @@ async fn draw_loading(f: &mut UiFrame<'_>, app: &App, chunk: Rect, msg: &str) ->
         )
         .margin(2)
         .split(rect);
-
-    debug!("Layout: {:?}", layout);
 
     f.render_widget(
         Paragraph::new([Text::raw(msg)].iter())
@@ -399,6 +400,7 @@ async fn draw_loading(f: &mut UiFrame<'_>, app: &App, chunk: Rect, msg: &str) ->
 
 pub fn draw_choose_minecraft_version(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
     let rect = util::centered_rect_percentage(90, 75, chunk);
+    f.render_widget(Clear, rect);
 
     let versions = &(app.minecraft_version_manifest.as_ref().unwrap().versions);
     // .iter()
@@ -433,33 +435,34 @@ pub fn draw_choose_minecraft_version(f: &mut UiFrame<'_>, app: &App, chunk: Rect
         })
         .collect();
 
-    let table = Table::new(
-        ["   Version id", "Type", "Release date"].iter(),
-        rows.into_iter(),
-    )
-    .block(
-        Block::default()
-            .title("Choose minecraft version")
-            .borders(Borders::ALL)
-            .border_type(BorderType::Plain),
-    )
-    .header_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD))
-    .widths(&[
-        Constraint::Percentage(40),
-        Constraint::Percentage(30),
-        Constraint::Percentage(30),
-    ])
-    .style(Style::default())
-    .highlight_style(Style::default().fg(Color::Blue).modifier(Modifier::BOLD))
-    .highlight_symbol(">> ")
-    .column_spacing(1)
-    .header_gap(0);
-
     let mut state = TableState::default();
     state.select(Some(app.new_instance.selected - offset));
 
-    f.render_widget(Clear, rect);
-    f.render_stateful_widget(table, rect, &mut state);
+    f.render_stateful_widget(
+        Table::new(
+            ["   Version id", "Type", "Release date"].iter(),
+            rows.into_iter(),
+        )
+        .block(
+            Block::default()
+                .title("Choose minecraft version")
+                .borders(Borders::ALL)
+                .border_type(BorderType::Plain),
+        )
+        .header_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD))
+        .widths(&[
+            Constraint::Percentage(40),
+            Constraint::Percentage(30),
+            Constraint::Percentage(30),
+        ])
+        .style(Style::default())
+        .highlight_style(Style::default().fg(Color::Blue).modifier(Modifier::BOLD))
+        .highlight_symbol(">> ")
+        .column_spacing(1)
+        .header_gap(0),
+        rect,
+        &mut state,
+    );
 
     RenderState::default()
 }
@@ -474,7 +477,6 @@ pub fn draw_forge_notice(f: &mut UiFrame<'_>, _app: &App, chunk: Rect) -> Render
         .constraints(
             [
                 Constraint::Length(6),
-                Constraint::Length(1),
                 Constraint::Length(1),
                 Constraint::Length(1),
             ]
@@ -524,38 +526,39 @@ https://www.patreon.com/LexManos";
 }
 
 pub fn draw_choose_forge(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
-    let mut rect = util::centered_rect_percentage_dir(Direction::Horizontal, 60, chunk);
-    rect.y = (rect.height / 2) - 5;
-    rect.height = 10;
+    let rect = util::centered_rect_percentage_dir(Direction::Horizontal, 60, chunk);
+    let rect = util::centered_rect_dir(Direction::Horizontal, 10, rect);
 
-    let block_widget = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Plain);
     f.render_widget(Clear, rect);
-    f.render_widget(block_widget, rect);
-    rect.x += 2;
-    rect.width -= 4;
+    f.render_widget(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Plain),
+        rect,
+    );
 
     let layout = Layout::default()
         .direction(Direction::Vertical)
+        .margin(1)
         .constraints(
             [
+                Constraint::Length(6),
                 Constraint::Length(1),
-                Constraint::Min(5),
                 Constraint::Length(1),
-                Constraint::Length(2),
             ]
             .as_ref(),
         )
         .split(rect);
 
     let text = vec![Text::raw("You will need a forge version to be able to install mods. Using the recommended version is usually a good idea unless you know you need another version. Would you like to install forge for this instance?")];
-    let text_widget = Paragraph::new(text.iter())
-        .alignment(Alignment::Center)
-        .style(Style::default().fg(Color::Yellow))
-        .wrap(true);
 
-    f.render_widget(text_widget, layout[1]);
+    f.render_widget(
+        Paragraph::new(text.iter())
+            .alignment(Alignment::Center)
+            .style(Style::default().fg(Color::Yellow))
+            .wrap(true),
+        layout[1],
+    );
 
     let button_layout = Layout::default()
         .direction(Direction::Horizontal)
@@ -595,6 +598,7 @@ pub fn draw_choose_forge(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderS
 
 pub fn draw_choose_forge_version(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
     let rect = util::centered_rect_percentage(90, 75, chunk);
+    f.render_widget(Clear, rect);
 
     let versions = &(app.forge_version_manifest.as_ref().unwrap().versions);
 
@@ -637,26 +641,27 @@ pub fn draw_choose_forge_version(f: &mut UiFrame<'_>, app: &App, chunk: Rect) ->
         })
         .collect();
 
-    let table = Table::new(["   Version id", "Release date"].iter(), rows.into_iter())
-        .block(
-            Block::default()
-                .title("Choose forge version")
-                .borders(Borders::ALL)
-                .border_type(BorderType::Plain),
-        )
-        .header_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD))
-        .widths(&[Constraint::Percentage(50), Constraint::Percentage(50)])
-        .style(Style::default())
-        .highlight_style(Style::default().fg(Color::Blue).modifier(Modifier::BOLD))
-        .highlight_symbol(">> ")
-        .column_spacing(1)
-        .header_gap(0);
+    let mut table_state = TableState::default();
+    table_state.select(Some(app.new_instance.selected - offset));
 
-    let mut state = TableState::default();
-    state.select(Some(app.new_instance.selected - offset));
-
-    f.render_widget(Clear, rect);
-    f.render_stateful_widget(table, rect, &mut state);
+    f.render_stateful_widget(
+        Table::new(["   Version id", "Release date"].iter(), rows.into_iter())
+            .block(
+                Block::default()
+                    .title("Choose forge version")
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Plain),
+            )
+            .header_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD))
+            .widths(&[Constraint::Percentage(50), Constraint::Percentage(50)])
+            .style(Style::default())
+            .highlight_style(Style::default().fg(Color::Blue).modifier(Modifier::BOLD))
+            .highlight_symbol(">> ")
+            .column_spacing(1)
+            .header_gap(0),
+        rect,
+        &mut table_state,
+    );
 
     RenderState::default()
 }

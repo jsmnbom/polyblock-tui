@@ -91,8 +91,8 @@ pub fn handle_key(key: Key, app: &mut App) {
 }
 
 pub fn draw(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
-    let instance = app.instance_menu.instance.as_ref().unwrap();
-
+    let state = &app.instance_menu;
+    let instance = state.instance.as_ref().unwrap();
     let instance_name = instance.name.clone();
 
     let items: Vec<String> = app
@@ -101,20 +101,6 @@ pub fn draw(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
         .iter()
         .map(|o| o.to_string())
         .collect();
-
-    let list = List::new(items.iter().map(|s| Text::raw(s)))
-        .block(
-            Block::default()
-                .title(&instance_name)
-                .borders(Borders::ALL)
-                .border_type(BorderType::Plain),
-        )
-        .style(Style::default())
-        .highlight_style(Style::default().fg(Color::Blue).modifier(Modifier::BOLD))
-        .highlight_symbol(">> ");
-
-    let mut list_state = ListState::default();
-    list_state.select(Some(app.instance_menu.selected));
 
     let rect = util::centered_rect(
         (items.len() + 2) as u16,
@@ -128,8 +114,24 @@ pub fn draw(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
         chunk,
     );
 
+    let mut list_state = ListState::default();
+    list_state.select(Some(state.selected));
+
     f.render_widget(Clear, rect);
-    f.render_stateful_widget(list, rect, &mut list_state);
+    f.render_stateful_widget(
+        List::new(items.iter().map(|s| Text::raw(s)))
+            .block(
+                Block::default()
+                    .title(&instance_name)
+                    .borders(Borders::ALL)
+                    .border_type(BorderType::Plain),
+            )
+            .style(Style::default())
+            .highlight_style(Style::default().fg(Color::Blue).modifier(Modifier::BOLD))
+            .highlight_symbol(">> "),
+        rect,
+        &mut list_state,
+    );
 
     RenderState::default()
 }
