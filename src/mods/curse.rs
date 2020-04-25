@@ -26,7 +26,7 @@ impl AddonFile {
             .context("Failed to get addon files.")?
             .error_for_status()
             .context("Failed to get addon files.")?;
-    
+
         #[derive(Deserialize, Serialize, Debug, Clone)]
         #[serde(rename_all = "camelCase")]
         pub struct RawAddonFile {
@@ -36,12 +36,12 @@ impl AddonFile {
             download_url: String,
             id: u64,
         }
-    
+
         let files: Vec<RawAddonFile> = response
             .json()
             .await
             .context("Failed to decode addon files.")?;
-    
+
         let files: Vec<AddonFile> = files
             .into_iter()
             .map(|file| AddonFile {
@@ -53,7 +53,7 @@ impl AddonFile {
                 project_id,
             })
             .collect();
-    
+
         Ok(files)
     }
 }

@@ -9,6 +9,8 @@ pub enum RouteId {
     Home,
     InstanceMenu,
     NewInstance,
+    RemoveInstance,
+    RenameInstance,
 }
 
 #[derive(Clone)]
@@ -25,6 +27,8 @@ pub struct App {
     pub home: view::home::State,
     pub instance_menu: view::instance_menu::State,
     pub new_instance: view::new_instance::State,
+    pub remove_instance: view::remove_instance::State,
+    pub rename_instance: view::rename_instance::State,
 
     pub should_quit: bool,
     pub hide_cursor: bool,
@@ -58,6 +62,8 @@ impl App {
             home: Default::default(),
             instance_menu: Default::default(),
             new_instance: Default::default(),
+            remove_instance: Default::default(),
+            rename_instance: Default::default(),
             should_quit: false,
             paths,
             instances,

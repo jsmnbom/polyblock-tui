@@ -1,4 +1,5 @@
 use ::anyhow::Context;
+use log::debug;
 use std::{fs, sync::Arc};
 use tokio::sync::RwLock;
 use uuid::Uuid;
@@ -10,6 +11,8 @@ pub enum IoEvent {
     FetchMinecraftVersionManifest,
     FetchForgeVersionManifest,
     CreateNewInstance,
+    RemoveInstance,
+    RenameInstance,
 }
 
 #[derive(Clone)]
@@ -148,6 +151,39 @@ impl<'a> Io<'a> {
                 app.instances.save()?;
 
                 app.pop_route();
+            }
+            RemoveInstance => {
+                let instance = {
+                    let app = self.app.read().await;
+                    let instance = app.remove_instance.instance.clone().unwrap();
+
+                    debug!("Removing launcher profile.");
+                    app.launcher.remove_profile(&instance)?;
+
+                    debug!("Removing data folder.");
+                    let _ = fs::remove_dir_all(&instance.directory());
+                    instance
+                };
+
+                let mut app = self.app.write().await;
+                debug!("Removing from config.");
+                app.instances.inner.remove(&instance.name);
+                app.instances.save()?;
+            }
+            RenameInstance => {
+                let mut app = self.app.write().await;
+                let mut instance = app.rename_instance.instance.clone().unwrap();
+
+                let old_name = instance.name;
+                instance.name = app.rename_instance.name_input.clone();
+
+                app.instances.inner.remove(&old_name);
+                app.instances
+                    .inner
+                    .insert(instance.name.clone(), instance.clone());
+                app.instances.save()?;
+
+                app.launcher.ensure_profile(&instance)?;
             }
         }
 

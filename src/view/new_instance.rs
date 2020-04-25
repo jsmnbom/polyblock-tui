@@ -59,31 +59,31 @@ impl Default for State {
 pub fn get_help(app: &App) -> Vec<(&'static str, &'static str)> {
     match app.new_instance.inner {
         InnerState::EnterName => vec![
+            ("ESC", "cancel"),
             // TODO: ("←/→", "move cursor"),
             ("⏎", "continue"),
-            ("ESC", "cancel"),
         ],
         InnerState::FetchMinecraftVersionManifest => Vec::new(),
         InnerState::ChooseMinecraftVersion => vec![
+            ("ESC", "cancel"),
             ("↑↓", "choose version"),
             ("PgUp/PgDn", "move cursor 25"),
             ("⏎", "select"),
-            ("ESC", "cancel"),
         ],
         InnerState::ChooseForge => vec![
+            ("ESC", "cancel"),
             ("←/→", "choose option"),
             ("Y", "yes"),
             ("N", "no"),
             ("⏎", "select"),
-            ("ESC", "cancel"),
         ],
         InnerState::ForgeNotice => vec![("⏎", "continue"), ("ESC", "cancel")],
         InnerState::FetchForgeVersionManifest => Vec::new(),
         InnerState::ChooseForgeVersion => vec![
+            ("ESC", "cancel"),
             ("↑↓", "choose version"),
             ("PgUp/PgDn", "move cursor 25"),
             ("⏎", "select"),
-            ("ESC", "cancel"),
         ],
         InnerState::Install => Vec::new(),
     }

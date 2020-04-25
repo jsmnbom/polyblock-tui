@@ -43,6 +43,8 @@ pub async fn draw_layout(f: &mut UiFrame<'_>, app: &mut App) {
         RouteId::Home => view::home::get_help(app),
         RouteId::InstanceMenu => view::instance_menu::get_help(app),
         RouteId::NewInstance => view::new_instance::get_help(app),
+        RouteId::RemoveInstance => view::remove_instance::get_help(app),
+        RouteId::RenameInstance => view::rename_instance::get_help(app),
     };
 
     let help = raw_help
@@ -68,6 +70,8 @@ pub async fn draw_layout(f: &mut UiFrame<'_>, app: &mut App) {
             RouteId::Home => view::home::draw(f, app, parent_layout[0]),
             RouteId::InstanceMenu => view::instance_menu::draw(f, app, parent_layout[0]),
             RouteId::NewInstance => view::new_instance::draw(f, app, parent_layout[0]).await,
+            RouteId::RemoveInstance => view::remove_instance::draw(f, app, parent_layout[0]),
+            RouteId::RenameInstance => view::rename_instance::draw(f, app, parent_layout[0]),
         });
     }
     app.hide_cursor = render_state.unwrap().hide_cursor;

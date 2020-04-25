@@ -236,33 +236,35 @@ impl Events {
         let (tx, rx) = mpsc::channel();
 
         let event_tx = tx.clone();
-        thread::Builder::new().name("events".into()).spawn(move || {
-            let mut last_tick = Instant::now();
-            let mut key_sent = false;
-            loop {
-                // poll for tick rate duration, if no event, sent tick event.
-                if event::poll(config.tick_rate_min).unwrap() {
-                    if let event::Event::Key(key) = event::read().unwrap() {
-                        // trace!("Got key: {:?}", key);
-                        let key = Key::from(key);
+        thread::Builder::new()
+            .name("events".into())
+            .spawn(move || {
+                let mut last_tick = Instant::now();
+                let mut key_sent = false;
+                loop {
+                    // poll for tick rate duration, if no event, sent tick event.
+                    if event::poll(config.tick_rate_min).unwrap() {
+                        if let event::Event::Key(key) = event::read().unwrap() {
+                            // trace!("Got key: {:?}", key);
+                            let key = Key::from(key);
 
-                        event_tx.send(Event::Input(key)).unwrap();
-                        key_sent = true;
+                            event_tx.send(Event::Input(key)).unwrap();
+                            key_sent = true;
+                        }
+                    }
+                    if last_tick.elapsed() > config.tick_rate_min && key_sent {
+                        // trace!("Over min tick rate - sending tick");
+                        event_tx.send(Event::Tick).unwrap();
+                        last_tick = Instant::now();
+                        key_sent = false;
+                    }
+                    if last_tick.elapsed() > config.tick_rate_max {
+                        // trace!("Over max tick rate - sending tick");
+                        event_tx.send(Event::Tick).unwrap();
+                        last_tick = Instant::now();
                     }
                 }
-                if last_tick.elapsed() > config.tick_rate_min && key_sent {
-                    // trace!("Over min tick rate - sending tick");
-                    event_tx.send(Event::Tick).unwrap();
-                    last_tick = Instant::now();
-                    key_sent = false;
-                }
-                if last_tick.elapsed() > config.tick_rate_max {
-                    // trace!("Over max tick rate - sending tick");
-                    event_tx.send(Event::Tick).unwrap();
-                    last_tick = Instant::now();
-                }
-            }
-        })?;
+            })?;
 
         Ok(Events { rx, _tx: tx })
     }

@@ -7,10 +7,10 @@ use tui::{
 
 use crate::{
     ui::{RenderState, UiFrame},
-    util, App, Key,
+    util, App, Instance, Key,
 };
 
-pub enum Option {
+pub enum MenuOption {
     Play,
     ManageMods,
     ChangeMinecraftVersion,
@@ -22,23 +22,23 @@ pub enum Option {
     Remove,
 }
 
-impl fmt::Display for Option {
+impl fmt::Display for MenuOption {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Option::Play => write!(f, "Play"),
-            Option::ManageMods => write!(f, "Manage mods"),
-            Option::ChangeMinecraftVersion => write!(f, "Change minecraft version"),
-            Option::ChangeForgeVersion => write!(f, "Change forge version"),
-            Option::AddForge => write!(f, "Add forge"),
-            Option::RemoveForge => write!(f, "Remove forge"),
-            Option::OpenDirectory => write!(f, "Open directory"),
-            Option::Rename => write!(f, "Rename"),
-            Option::Remove => write!(f, "Remove"),
+            MenuOption::Play => write!(f, "Play"),
+            MenuOption::ManageMods => write!(f, "Manage mods"),
+            MenuOption::ChangeMinecraftVersion => write!(f, "Change minecraft version"),
+            MenuOption::ChangeForgeVersion => write!(f, "Change forge version"),
+            MenuOption::AddForge => write!(f, "Add forge"),
+            MenuOption::RemoveForge => write!(f, "Remove forge"),
+            MenuOption::OpenDirectory => write!(f, "Open directory"),
+            MenuOption::Rename => write!(f, "Rename"),
+            MenuOption::Remove => write!(f, "Remove"),
         }
     }
 }
 
-impl Option {
+impl MenuOption {
     pub fn vanilla() -> Vec<Self> {
         vec![
             Self::Play,
@@ -67,12 +67,12 @@ impl Option {
 #[derive(Default)]
 pub struct State {
     pub selected: usize,
-    pub options: Vec<Option>,
-    pub instance_name: String,
+    pub options: Vec<MenuOption>,
+    pub instance: Option<Instance>,
 }
 
 pub fn get_help(_app: &App) -> Vec<(&'static str, &'static str)> {
-    vec![("↑/↓", "move cursor"), ("⏎", "select"), ("ESC", "back")]
+    vec![("ESC", "back"), ("↑/↓", "move cursor"), ("⏎", "select")]
 }
 
 pub fn handle_key(key: Key, app: &mut App) {
@@ -91,16 +91,21 @@ pub fn handle_key(key: Key, app: &mut App) {
 }
 
 pub fn draw(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
-    let state = &app.instance_menu;
+    let instance = app.instance_menu.instance.as_ref().unwrap();
 
-    let instance_name = &state.instance_name;
+    let instance_name = instance.name.clone();
 
-    let items: Vec<String> = state.options.iter().map(|o| o.to_string()).collect();
+    let items: Vec<String> = app
+        .instance_menu
+        .options
+        .iter()
+        .map(|o| o.to_string())
+        .collect();
 
     let list = List::new(items.iter().map(|s| Text::raw(s)))
         .block(
             Block::default()
-                .title(instance_name)
+                .title(&instance_name)
                 .borders(Borders::ALL)
                 .border_type(BorderType::Plain),
         )
@@ -109,7 +114,7 @@ pub fn draw(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
         .highlight_symbol(">> ");
 
     let mut list_state = ListState::default();
-    list_state.select(Some(state.selected));
+    list_state.select(Some(app.instance_menu.selected));
 
     let rect = util::centered_rect(
         (items.len() + 2) as u16,

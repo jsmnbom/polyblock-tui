@@ -8,7 +8,6 @@ use std::fs::{create_dir_all, File};
 use std::io::{BufWriter, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::Arc;
 
 use super::manifest::{VersionManifestVersion, URL};
 use crate::minecraft;

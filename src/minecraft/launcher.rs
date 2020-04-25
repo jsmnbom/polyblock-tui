@@ -1,7 +1,7 @@
 use crate::Instance;
 use anyhow::{anyhow, Context};
 use chrono::{DateTime, Utc};
-use log::{debug, /*trace*/};
+use log::debug;
 //use notify::{op::Op, raw_watcher, RawEvent, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use std::{
