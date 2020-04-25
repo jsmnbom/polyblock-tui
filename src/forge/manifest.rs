@@ -120,36 +120,36 @@ impl VersionManifest {
             .context("Failed to decode forge version manifest timestamp")?)
     }
 
-    pub fn find_version_from_name(
-        &self,
-        forge_name: &str,
-    ) -> ::anyhow::Result<VersionManifestVersion> {
-        Ok(self
-            .versions
-            .iter()
-            .find(|forge_version| forge_version.name == forge_name)
-            .ok_or(anyhow!("Could not find forge version."))
-            .map(Clone::clone)?)
-    }
+    // pub fn find_version_from_name(
+    //     &self,
+    //     forge_name: &str,
+    // ) -> ::anyhow::Result<VersionManifestVersion> {
+    //     Ok(self
+    //         .versions
+    //         .iter()
+    //         .find(|forge_version| forge_version.name == forge_name)
+    //         .ok_or(anyhow!("Could not find forge version."))
+    //         .map(Clone::clone)?)
+    // }
 
-    pub fn find_version(
-        &self,
-        version_str: &str,
-        minecraft_version_id: &str,
-    ) -> ::anyhow::Result<VersionManifestVersion> {
-        let version_str = version_str.trim_start_matches("forge-");
-        Ok(self
-            .versions
-            .iter()
-            .find(|forge_version| {
-                forge_version.name.trim_start_matches("forge-") == version_str
-                    || (forge_version.game_version == minecraft_version_id
-                        && ((version_str == "recommended" && forge_version.recommended)
-                            || (version_str == "latest" && forge_version.latest)))
-            })
-            .ok_or(anyhow!(
-                "Specified forge version could not be found for version of minecraft."
-            ))
-            .map(Clone::clone)?)
-    }
+    // pub fn find_version(
+    //     &self,
+    //     version_str: &str,
+    //     minecraft_version_id: &str,
+    // ) -> ::anyhow::Result<VersionManifestVersion> {
+    //     let version_str = version_str.trim_start_matches("forge-");
+    //     Ok(self
+    //         .versions
+    //         .iter()
+    //         .find(|forge_version| {
+    //             forge_version.name.trim_start_matches("forge-") == version_str
+    //                 || (forge_version.game_version == minecraft_version_id
+    //                     && ((version_str == "recommended" && forge_version.recommended)
+    //                         || (version_str == "latest" && forge_version.latest)))
+    //         })
+    //         .ok_or(anyhow!(
+    //             "Specified forge version could not be found for version of minecraft."
+    //         ))
+    //         .map(Clone::clone)?)
+    // }
 }

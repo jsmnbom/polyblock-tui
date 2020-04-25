@@ -1,16 +1,16 @@
 use crate::Instance;
 use anyhow::{anyhow, Context};
 use chrono::{DateTime, Utc};
-use log::{debug, trace};
-use notify::{op::Op, raw_watcher, RawEvent, RecursiveMode, Watcher};
+use log::{debug, /*trace*/};
+//use notify::{op::Op, raw_watcher, RawEvent, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     fs,
     io::{BufReader, BufWriter},
     path::PathBuf,
-    process::{Child, Command},
-    sync::mpsc::channel,
+    //process::{Child, Command},
+    //sync::mpsc::channel,
 };
 
 use super::VersionManifestVersion;
@@ -157,56 +157,56 @@ impl Launcher {
         })
     }
 
-    pub fn launch(&self) -> ::anyhow::Result<Child> {
-        Ok(Command::new(&self.launcher_exec)
-            .current_dir(&self.cache_directory)
-            .arg("--workDir")
-            .arg(&self.work_directory)
-            .spawn()
-            .context("Could not launch minecraft launcher. Is the launcher executable path set correctly?")?)
-    }
+    // pub fn launch(&self) -> ::anyhow::Result<Child> {
+    //     Ok(Command::new(&self.launcher_exec)
+    //         .current_dir(&self.cache_directory)
+    //         .arg("--workDir")
+    //         .arg(&self.work_directory)
+    //         .spawn()
+    //         .context("Could not launch minecraft launcher. Is the launcher executable path set correctly?")?)
+    // }
 
-    pub fn launch_instance(&self, instance: &Instance) -> ::anyhow::Result<()> {
-        self.ensure_profile(instance)?;
-        let _ = self.launch()?;
+    // pub fn launch_instance(&self, instance: &Instance) -> ::anyhow::Result<()> {
+    //     self.ensure_profile(instance)?;
+    //     let _ = self.launch()?;
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
-    fn wait_for_init(&self) -> ::anyhow::Result<()> {
-        debug!("Attaching a watcher on {:?}", &self.work_directory);
-        let (tx, rx) = channel();
-        let mut watcher = raw_watcher(tx).context("Failed to set up watcher.")?;
-        watcher
-            .watch(&self.work_directory, RecursiveMode::Recursive)
-            .context("Failed to start watcher.")?;
+    // fn wait_for_init(&self) -> ::anyhow::Result<()> {
+    //     debug!("Attaching a watcher on {:?}", &self.work_directory);
+    //     let (tx, rx) = channel();
+    //     let mut watcher = raw_watcher(tx).context("Failed to set up watcher.")?;
+    //     watcher
+    //         .watch(&self.work_directory, RecursiveMode::Recursive)
+    //         .context("Failed to start watcher.")?;
 
-        let versions_directory = self.work_directory.join("versions");
+    //     let versions_directory = self.work_directory.join("versions");
 
-        loop {
-            match rx.recv() {
-                Ok(RawEvent {
-                    path: Some(path),
-                    op: Ok(op),
-                    cookie: _,
-                }) => {
-                    trace!("Watcher: {:?} {:?}", path, op);
+    //     loop {
+    //         match rx.recv() {
+    //             Ok(RawEvent {
+    //                 path: Some(path),
+    //                 op: Ok(op),
+    //                 cookie: _,
+    //             }) => {
+    //                 trace!("Watcher: {:?} {:?}", path, op);
 
-                    if path == versions_directory && op == Op::CREATE {
-                        debug!("Found version directory. Detaching watcher.");
-                        watcher
-                            .unwatch(&self.work_directory)
-                            .context("Failed to stop watcher.")?;
-                        break;
-                    }
-                }
-                Ok(_event) => panic!("Broken event received by watcher!"),
-                Err(e) => Err(e).context("Failed to receive watch event.")?,
-            }
-        }
+    //                 if path == versions_directory && op == Op::CREATE {
+    //                     debug!("Found version directory. Detaching watcher.");
+    //                     watcher
+    //                         .unwatch(&self.work_directory)
+    //                         .context("Failed to stop watcher.")?;
+    //                     break;
+    //                 }
+    //             }
+    //             Ok(_event) => panic!("Broken event received by watcher!"),
+    //             Err(e) => Err(e).context("Failed to receive watch event.")?,
+    //         }
+    //     }
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
     fn read(&self) -> ::anyhow::Result<LauncherConfig> {
         debug!("Reading launcher profiles.");
@@ -227,6 +227,7 @@ impl Launcher {
 
     pub fn ensure_profile(&self, instance: &Instance) -> ::anyhow::Result<()> {
         debug!("Ensuring launcher profile for {:?}", instance);
+        //TODO: WHat if the launcher profiles file wasn't created yet?
         let mut config = self.read()?;
 
         let uuid_key = instance.uuid.to_simple().to_string();
