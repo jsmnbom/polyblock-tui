@@ -1,6 +1,9 @@
 use crossterm::{cursor::MoveTo, execute};
 use log::debug;
-use std::io::{self, Write};
+use std::{
+    io::{self, Write},
+    iter,
+};
 use tui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -20,6 +23,7 @@ pub enum InnerState {
     FetchMinecraftVersionManifest,
     ChooseMinecraftVersion,
     ChooseForge,
+    ForgeNotice,
     FetchForgeVersionManifest,
     ChooseForgeVersion,
     Install,
@@ -33,8 +37,8 @@ pub struct State {
     selected: usize,
     pub chosen_minecraft_version: Option<minecraft::VersionManifestVersion>,
     pub chosen_forge_version: Option<forge::VersionManifestVersion>,
-    pub progress_main: util::Progress,
-    pub progress_sub: util::Progress,
+    pub progress_main: Option<util::Progress>,
+    pub progress_sub: Option<util::Progress>,
 }
 
 impl Default for State {
@@ -46,8 +50,8 @@ impl Default for State {
             selected: 0,
             chosen_minecraft_version: None,
             chosen_forge_version: None,
-            progress_main: util::Progress::new(),
-            progress_sub: util::Progress::new(),
+            progress_main: None,
+            progress_sub: None,
         }
     }
 }
@@ -73,6 +77,7 @@ pub fn get_help(app: &App) -> Vec<(&'static str, &'static str)> {
             ("⏎", "select"),
             ("ESC", "cancel"),
         ],
+        InnerState::ForgeNotice => vec![("⏎", "continue"), ("ESC", "cancel")],
         InnerState::FetchForgeVersionManifest => Vec::new(),
         InnerState::ChooseForgeVersion => vec![
             ("↑↓", "choose version"),
@@ -161,8 +166,7 @@ pub fn handle_key(key: Key, app: &mut App) {
             Key::Left => app.new_instance.selected = util::wrap_dec(app.new_instance.selected, 2),
             Key::Right => app.new_instance.selected = util::wrap_inc(app.new_instance.selected, 2),
             Key::Char('y') => {
-                app.dispatch(IoEvent::FetchForgeVersionManifest);
-                app.new_instance.inner = InnerState::FetchForgeVersionManifest;
+                app.new_instance.inner = InnerState::ForgeNotice;
                 app.new_instance.selected = 0;
             }
             Key::Char('n') => {
@@ -172,13 +176,19 @@ pub fn handle_key(key: Key, app: &mut App) {
             }
             Key::Enter => {
                 if app.new_instance.selected == 0 {
-                    app.dispatch(IoEvent::FetchForgeVersionManifest);
-                    app.new_instance.inner = InnerState::FetchForgeVersionManifest;
+                    app.new_instance.inner = InnerState::ForgeNotice;
                 } else {
                     app.dispatch(IoEvent::CreateNewInstance);
                     app.new_instance.inner = InnerState::Install;
                 }
                 app.new_instance.selected = 0;
+            }
+            _ => {}
+        },
+        InnerState::ForgeNotice => match key {
+            Key::Enter => {
+                app.dispatch(IoEvent::FetchForgeVersionManifest);
+                app.new_instance.inner = InnerState::FetchForgeVersionManifest;
             }
             _ => {}
         },
@@ -254,29 +264,16 @@ pub async fn draw(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
     match &app.new_instance.inner {
         InnerState::EnterName => draw_enter_name(f, app, chunk),
         InnerState::FetchMinecraftVersionManifest => {
-            app.new_instance
-                .progress_main
-                .set_msg("Loading minecraft version manifest...")
-                .await;
-            draw_loading(f, app, chunk).await
+            draw_loading(f, app, chunk, "Loading minecraft version manifest...").await
         }
         InnerState::ChooseMinecraftVersion => draw_choose_minecraft_version(f, app, chunk),
         InnerState::ChooseForge => draw_choose_forge(f, app, chunk),
+        InnerState::ForgeNotice => draw_forge_notice(f, app, chunk),
         InnerState::FetchForgeVersionManifest => {
-            app.new_instance
-                .progress_main
-                .set_msg("Loading forge version manifest...")
-                .await;
-            draw_loading(f, app, chunk).await
+            draw_loading(f, app, chunk, "Loading forge version manifest...").await
         }
         InnerState::ChooseForgeVersion => draw_choose_forge_version(f, app, chunk),
-        InnerState::Install => {
-            app.new_instance
-                .progress_main
-                .set_msg("Creating your new instance")
-                .await;
-            draw_loading(f, app, chunk).await
-        }
+        InnerState::Install => draw_loading(f, app, chunk, "Creating your new instance").await,
     }
 }
 
@@ -316,51 +313,86 @@ fn draw_enter_name(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
     RenderState::default().show_cursor()
 }
 
-async fn draw_loading(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
+async fn draw_loading(f: &mut UiFrame<'_>, app: &App, chunk: Rect, msg: &str) -> RenderState {
     debug!("About to draw loading");
     let rect = util::centered_rect_percentage_dir(Direction::Horizontal, 50, chunk);
-    debug!("rect1 {:?}", rect);
-    let rect = util::centered_rect_dir(Direction::Vertical, 7, rect);
-    debug!("rect2 {:?}", rect);
+    let mut height: u16 = 5;
+    let mut to_draw: Vec<(f64, String)> = Vec::new();
+    for progress in &[
+        app.new_instance.progress_main.as_ref(),
+        app.new_instance.progress_sub.as_ref(),
+    ] {
+        if let Some(progress) = progress {
+            let msg = progress.get_msg().await;
+            let ratio = progress.get().await;
+
+            height += 2;
+            if !msg.is_empty() {
+                height += 1;
+            }
+            to_draw.push((ratio, msg));
+        };
+    }
+    debug!("To draw: {:?}", to_draw);
+    debug!("Height: {:?}", height);
+    let rect = util::centered_rect_dir(Direction::Vertical, height, rect);
+    f.render_widget(Clear, rect);
+    f.render_widget(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Plain),
+        rect,
+    );
 
     let layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints(
-            [
-                Constraint::Length(1),
-                Constraint::Length(1),
-                Constraint::Length(1),
-            ]
-            .as_ref(),
+            iter::repeat(Constraint::Length(1))
+                .take((height - 4) as usize)
+                .collect::<Vec<_>>(),
         )
         .margin(2)
         .split(rect);
 
-    let block_widget = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Plain);
+    debug!("Layout: {:?}", layout);
 
-    let text = vec![Text::raw(app.new_instance.progress_main.get_msg().await)];
-    let text_widget = Paragraph::new(text.iter())
-        .style(Style::default().fg(Color::Yellow))
-        .alignment(Alignment::Center);
+    f.render_widget(
+        Paragraph::new([Text::raw(msg)].iter())
+            .style(Style::default().fg(Color::Yellow))
+            .alignment(Alignment::Center),
+        layout[0],
+    );
 
-    let ratio = app.new_instance.progress_main.get().await;
-    let label = format!("{:0}%", (ratio * 100.0));
-    let gauge_widget = Gauge::default()
-        .style(
-            Style::default()
-                .fg(Color::White)
-                .bg(Color::Black)
-                .modifier(Modifier::ITALIC),
-        )
-        .label(&label)
-        .ratio(ratio);
+    let mut i: usize = 2;
 
-    f.render_widget(Clear, rect);
-    f.render_widget(block_widget, rect);
-    f.render_widget(text_widget, layout[0]);
-    f.render_widget(gauge_widget, layout[2]);
+    for (ratio, msg) in to_draw {
+        let label = format!("{:.0}%", (ratio * 100.0));
+        debug!("Ratio {:?}, msg: {:?}, label: {:?}", ratio, msg, label);
+        f.render_widget(
+            Gauge::default()
+                .style(
+                    Style::default()
+                        .fg(Color::White)
+                        .bg(Color::Black)
+                        .modifier(Modifier::ITALIC),
+                )
+                .label(&label)
+                .ratio(ratio),
+            layout[i],
+        );
+
+        if !msg.is_empty() {
+            i += 1;
+            f.render_widget(
+                Paragraph::new([Text::raw(msg)].iter())
+                    .style(Style::default().fg(Color::Yellow))
+                    .alignment(Alignment::Center),
+                layout[i],
+            );
+        }
+
+        i += 2;
+    }
 
     RenderState::default()
 }
@@ -428,6 +460,65 @@ pub fn draw_choose_minecraft_version(f: &mut UiFrame<'_>, app: &App, chunk: Rect
 
     f.render_widget(Clear, rect);
     f.render_stateful_widget(table, rect, &mut state);
+
+    RenderState::default()
+}
+
+pub fn draw_forge_notice(f: &mut UiFrame<'_>, _app: &App, chunk: Rect) -> RenderState {
+    let rect = util::centered_rect_percentage_dir(Direction::Horizontal, 60, chunk);
+    let rect = util::centered_rect_dir(Direction::Vertical, 10, rect);
+
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(1)
+        .constraints(
+            [
+                Constraint::Length(6),
+                Constraint::Length(1),
+                Constraint::Length(1),
+                Constraint::Length(1),
+            ]
+            .as_ref(),
+        )
+        .split(rect);
+
+    let text = "Forge is an open source project that mostly relies on ad revenue.
+By using Polyblock you bypass viewing these ads.
+Please strongly consider supporting the creator of Forge LexManos' Patreon.
+https://www.patreon.com/LexManos";
+
+    f.render_widget(Clear, rect);
+    f.render_widget(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Plain),
+        rect,
+    );
+    f.render_widget(
+        Paragraph::new([Text::raw(text)].iter())
+            .alignment(Alignment::Center)
+            .style(Style::default().fg(Color::Yellow))
+            .wrap(true),
+        layout[0],
+    );
+
+    let button_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(
+            [
+                Constraint::Length((layout[2].width - 6) / 2),
+                Constraint::Length(6),
+                Constraint::Length((layout[2].width / 6) / 2),
+            ]
+            .as_ref(),
+        )
+        .split(layout[2]);
+
+    f.render_widget(
+        Paragraph::new(vec![Text::raw("[ Ok ]")].iter())
+            .style(Style::default().fg(Color::Blue).modifier(Modifier::BOLD)),
+        button_layout[1],
+    );
 
     RenderState::default()
 }

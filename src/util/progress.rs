@@ -1,4 +1,4 @@
-use std::sync::{Arc};
+use std::sync::Arc;
 use tokio::sync::RwLock;
 
 #[derive(Clone)]
@@ -36,6 +36,12 @@ impl Progress {
         self.state.write().await.value += val;
     }
 
+    pub async fn inc_with_msg<S: Into<String>>(&self, val: u64, msg: S) {
+        let mut state = self.state.write().await;
+        state.value += val;
+        state.msg = msg.into();
+    }
+
     pub async fn get(&self) -> f64 {
         let state = self.state.read().await;
         if state.length == 0 {
@@ -48,6 +54,7 @@ impl Progress {
         let mut state = self.state.write().await;
         state.length = 0;
         state.value = 0;
+        state.msg = String::new();
     }
 
     pub async fn get_msg(&self) -> String {

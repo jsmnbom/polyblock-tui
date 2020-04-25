@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fs::{create_dir_all, File};
-use std::io::{BufReader, BufWriter};
+use std::io::{BufWriter, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
@@ -75,22 +75,15 @@ struct Manifest {
 }
 
 pub async fn install<P: AsRef<Path>>(
-    // steps: &mut progress::StepProgress,
+    main_pb: &util::Progress,
+    sub_pb: &util::Progress,
     minecraft_version: &minecraft::VersionManifestVersion,
     version: VersionManifestVersion,
     forge_version_manifests_cache_directory: P,
     launcher: &minecraft::Launcher,
     java_home: Option<PathBuf>,
 ) -> ::anyhow::Result<()> {
-    // steps.add(vec![
-    //     "Locating java.",
-    //     "Fetching forge manifest for version.",
-    //     "Downloading minecraft version.",
-    //     "Writing forge version file.",
-    //     "Downloading libraries",
-    //     "Installing forge",
-    // ]);
-    // steps.inc();
+    main_pb.inc_with_msg(1, "Locating java.").await;
 
     create_dir_all(&forge_version_manifests_cache_directory)
         .context("Failed to create forge version manifests cache directory!")?;
@@ -100,7 +93,9 @@ pub async fn install<P: AsRef<Path>>(
 
     debug!("Using java at: {:?}", java_exec);
 
-    // steps.inc();
+    main_pb
+        .inc_with_msg(1, "Fetching forge manifest for version.")
+        .await;
 
     let manifest = download_manifest(
         forge_version_manifests_cache_directory
@@ -122,10 +117,13 @@ pub async fn install<P: AsRef<Path>>(
             )
         })?;
 
-    // steps.inc();
-    launcher.download_version(minecraft_version).await?;
+    main_pb
+        .inc_with_msg(1, "Downloading minecraft version.")
+        .await;
+    launcher.download_version(sub_pb, minecraft_version).await?;
+    sub_pb.reset().await;
 
-    // steps.inc();
+    main_pb.inc_with_msg(1, "Writing forge version file.").await;
     write_version_file(
         minecraft_version.id.clone(),
         manifest.name,
@@ -133,12 +131,14 @@ pub async fn install<P: AsRef<Path>>(
         launcher.versions_directory.clone(),
     )?;
 
-    // steps.inc();
+    main_pb.inc_with_msg(1, "Downloading libraries.").await;
     download_libraries(
+        sub_pb,
         install_profile.libraries,
         launcher.libraries_directory.clone(),
     )
     .await?;
+    sub_pb.reset().await;
 
     let forge_jar_maven: String = install_profile.data["PATCHED"].client.clone();
     let forge_jar_maven = &forge_jar_maven[1..forge_jar_maven.len() - 1];
@@ -150,12 +150,11 @@ pub async fn install<P: AsRef<Path>>(
     let forge_jar_sha1: String = install_profile.data["PATCHED_SHA"].client.clone();
     let forge_jar_sha1 = &forge_jar_sha1[1..forge_jar_sha1.len() - 1];
 
-    print_forge_notice();
-
-    // steps.inc();
+    main_pb.inc_with_msg(1, "Installing forge.").await;
 
     if forge_jar.exists() {
         debug!("Patched forge already exists.");
+        main_pb.inc_with_msg(1, "Checking forge.").await;
         let hash = util::sha1_file(&forge_jar)?;
         if hash == forge_jar_sha1 {
             debug!("Patched forge checksum ok.");
@@ -168,6 +167,7 @@ pub async fn install<P: AsRef<Path>>(
     debug!("Running forge install processors.");
 
     run_processors(
+        sub_pb,
         java_exec,
         launcher.libraries_directory.clone(),
         install_profile.processors,
@@ -176,9 +176,12 @@ pub async fn install<P: AsRef<Path>>(
         launcher
             .libraries_directory
             .join(util::java::parse_maven(install_profile.path)),
-    )?;
+    )
+    .await?;
+    sub_pb.reset().await;
 
-    let hash = util::sha1_file(&forge_jar)?;
+    main_pb.inc_with_msg(1, "Checking forge.").await;
+    let hash = util::sha1_file_with_progress(sub_pb, &forge_jar).await?;
     if hash != forge_jar_sha1 {
         return Err(anyhow!("Patched forge jar does not match checksum!"));
     }
@@ -186,45 +189,29 @@ pub async fn install<P: AsRef<Path>>(
     Ok(())
 }
 
-fn print_forge_notice() {
-    println!(
-        "Forge is an open source project that mostly relies on ad revenue.
-By using Polyblock you bypass viewing these ads.
-Please strongly consider supporting the creator of Forge LexManos' Patreon.
-https://www.patreon.com/LexManos"
-    );
-}
-
 async fn download_manifest(
     manifest_path: PathBuf,
     version: &VersionManifestVersion,
 ) -> ::anyhow::Result<Manifest> {
-    // let pb = progress::create_bar("", None, Some("Checking"));
-
     if !manifest_path.exists() {
-        util::download_file(
-            // &pb,
-            &format!("{}/{}", URL, version.name),
-            &manifest_path,
-        )
-        .await?;
+        util::download_file(&format!("{}/{}", URL, version.name), &manifest_path).await?;
     }
 
-    let manifest_file = File::open(&manifest_path)?;
-    let manifest_reader = BufReader::new(manifest_file);
-    let manifest: Manifest = serde_json::from_reader(manifest_reader)
+    let mut manifest_file = File::open(&manifest_path)?;
+    let mut manifest_str = String::new();
+    manifest_file.read_to_string(&mut manifest_str)?;
+    let manifest: Manifest = serde_json::from_str(&manifest_str)
         .with_context(|| format!("Failed to read forge manifest for version {}", version.name))?;
-
-    // pb.finish_and_clear();
 
     Ok(manifest)
 }
 
 async fn download_libraries(
+    pb: &util::Progress,
     libraries: Vec<InstallProfileLibrary>,
     libraries_directory: PathBuf,
 ) -> ::anyhow::Result<()> {
-    // let dmp = Arc::new(progress::DynamicMultiProgress::new());
+    pb.set_length(libraries.len() as u64).await;
 
     let results: Vec<::anyhow::Result<()>> =
         futures::stream::iter(libraries.into_iter().map(|library| {
@@ -234,10 +221,10 @@ async fn download_libraries(
                     path, url, sha1, ..
                 } => {
                     let library_path = libraries_directory.join(path);
-                    // let dmp = dmp.clone();
                     async move {
-                        // let pb = dmp.add_new(&name, None, Some("Checking"));
-                        download_library(name, library_path, url, sha1).await
+                        let r = download_library(name, library_path, url, sha1).await;
+                        pb.inc(1).await;
+                        r
                     }
                 }
             }
@@ -246,13 +233,10 @@ async fn download_libraries(
         .collect::<Vec<_>>()
         .await;
 
-    // dmp.finish();
-
     results.into_iter().collect::<::anyhow::Result<_>>()
 }
 
 async fn download_library(
-    // pb: ProgressBar,
     name: String,
     path: PathBuf,
     url: String,
@@ -315,7 +299,8 @@ async fn download_library(
     Ok(())
 }
 
-fn run_processors(
+async fn run_processors(
+    pb: &util::Progress,
     java_exec: PathBuf,
     libraries_directory: PathBuf,
     processors: Vec<InstallProfileProcessor>,
@@ -325,7 +310,7 @@ fn run_processors(
 ) -> ::anyhow::Result<()> {
     let classpath_divider = OsString::from(if cfg!(windows) { ";" } else { ":" });
 
-    // let pb = progress::create_bar("", Some(processors.len() as u64), None);
+    pb.set_length(processors.len() as u64).await;
 
     for processor in processors {
         debug!("Running processor: {}", processor.jar);
@@ -418,10 +403,8 @@ fn run_processors(
             return Err(anyhow!("Processor failed to execute."));
         }
 
-        // pb.inc(1);
+        pb.inc(1).await;
     }
-
-    // pb.finish_and_clear();
 
     Ok(())
 }

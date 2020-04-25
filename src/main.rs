@@ -14,7 +14,7 @@ use std::{
     thread,
 };
 use structopt::StructOpt;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 use tui::{backend::CrosstermBackend, Terminal};
 
 mod app;
@@ -102,7 +102,7 @@ async fn main() -> ::anyhow::Result<()> {
 
     let (io_tx, io_rx) = channel::<IoEvent>();
 
-    let app = Arc::new(Mutex::new(App::new(&opt, io_tx)?));
+    let app = Arc::new(RwLock::new(App::new(&opt, io_tx)?));
     let cloned_app = Arc::clone(&app);
 
     let reqwest_client = reqwest::Client::builder()
@@ -119,37 +119,42 @@ async fn main() -> ::anyhow::Result<()> {
     })?;
 
     loop {
-        let mut app = cloned_app.lock().await;
+        {
+            let mut app = cloned_app.write().await;
 
-        // Replicate start of terminal.draw so we can draw async
-        terminal.autoresize()?;
-        let mut frame = terminal.get_frame();
-        ui::draw_layout(&mut frame, &mut app).await;
-        terminal.draw(|_| {})?;
+            // Replicate start of terminal.draw so we can draw async
+            terminal.autoresize()?;
+            let mut frame = terminal.get_frame();
+            ui::draw_layout(&mut frame, &mut app).await;
+            terminal.draw(|_| {})?;
 
-        #[allow(irrefutable_let_patterns)]
-        while let event = events.next()? {
-            match event {
-                Event::Input(key) => {
-                    if key == Key::Ctrl('c') {
-                        app.should_quit = true;
-                        break;
+            #[allow(irrefutable_let_patterns)]
+            while let event = events.next()? {
+                match event {
+                    Event::Input(key) => {
+                        if key == Key::Ctrl('c') {
+                            app.should_quit = true;
+                            break;
+                        }
+
+                        input::handle(key, &mut app);
                     }
-
-                    input::handle(key, &mut app);
+                    Event::Tick => break,
                 }
-                Event::Tick => break,
             }
         }
+        {
+            let app = cloned_app.read().await;
 
-        if app.should_quit {
-            break;
-        }
+            if app.should_quit {
+                break;
+            }
 
-        if app.hide_cursor {
-            terminal.hide_cursor()?;
-        } else {
-            terminal.show_cursor()?;
+            if app.hide_cursor {
+                terminal.hide_cursor()?;
+            } else {
+                terminal.show_cursor()?;
+            }
         }
     }
 
@@ -163,7 +168,9 @@ async fn io_inner(io_rx: Receiver<IoEvent>, io: &mut Io) {
     while let Ok(io_event) = io_rx.recv() {
         match io.handle_io_event(io_event).await {
             Ok(_) => {}
-            Err(e) => panic!(e),
+            Err(e) => {
+                panic!(format!("{:?}", e));
+            }
         };
     }
 }

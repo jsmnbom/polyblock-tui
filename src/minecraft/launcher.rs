@@ -58,6 +58,7 @@ pub struct LauncherConfig {
     other: Other,
 }
 
+#[derive(Clone)]
 pub struct Launcher {
     work_directory: PathBuf,
     pub libraries_directory: PathBuf,
@@ -264,33 +265,33 @@ impl Launcher {
         Ok(())
     }
 
-    pub async fn download_version(&self, version: &VersionManifestVersion) -> ::anyhow::Result<()> {
-        let version_json = self.download_version_json(version).await?;
-        self.download_version_jar(version, version_json).await?;
+    pub async fn download_version(
+        &self,
+        pb: &util::Progress,
+        version: &VersionManifestVersion,
+    ) -> ::anyhow::Result<()> {
+        let version_json = self.download_version_json(pb, version).await?;
+        self.download_version_jar(pb, version, version_json).await?;
         Ok(())
     }
 
     async fn download_version_json(
         &self,
+        pb: &util::Progress,
         version: &VersionManifestVersion,
     ) -> ::anyhow::Result<LauncherVersion> {
         let version_json_path = version.launcher_version_json(&self.versions_directory);
 
-        // let pb = progress::create_bar(
-        //     version_json_path.file_name().unwrap().to_str().unwrap(),
-        //     None,
-        //     Some("Checking"),
-        // );
+        pb.reset().await;
+        pb.set_msg("Downloading version json.").await;
 
         if !version_json_path.exists() {
             debug!(
                 "Version json for version {} missing. Downloading...",
                 version.id
             );
-            // utils::download_file_with_progress(&pb, &version.url, &version_json_path).await?;
+            util::download_file_with_progress(pb, &version.url, &version_json_path).await?;
         }
-
-        // pb.finish_and_clear();
 
         let version_json_file = fs::File::open(&version_json_path)?;
         let version_json_reader = BufReader::new(version_json_file);
@@ -299,17 +300,15 @@ impl Launcher {
 
     async fn download_version_jar(
         &self,
+        pb: &util::Progress,
         version: &VersionManifestVersion,
         version_json: LauncherVersion,
     ) -> ::anyhow::Result<()> {
         let version_jar_path = version.launcher_version_jar(&self.versions_directory);
         let download = version_json.downloads.get("client").unwrap();
 
-        // let pb = progress::create_bar(
-        //     version_jar_path.file_name().unwrap().to_str().unwrap(),
-        //     None,
-        //     Some("Checking"),
-        // );
+        pb.reset().await;
+        pb.set_msg("Downloading version jar.").await;
 
         if !version_jar_path.exists() {
             debug!(
@@ -317,20 +316,19 @@ impl Launcher {
                 version.id
             );
 
-            // utils::download_file_with_progress(&pb, &download.url, &version_jar_path).await?;
+            util::download_file_with_progress(pb, &download.url, &version_jar_path).await?;
         }
 
-        // progress::set_prefix(&pb, "Checking");
+        pb.reset().await;
+        pb.set_msg("Checking version jar.").await;
 
-        let hash = util::sha1_file(&version_jar_path)?;
+        let hash = util::sha1_file_with_progress(pb, &version_jar_path).await?;
         if hash != download.sha1 {
             return Err(anyhow!(
                 "Version jar for version {} does not match its sha1.",
                 version.id
             ));
         }
-
-        // pb.finish_and_clear();
 
         Ok(())
     }

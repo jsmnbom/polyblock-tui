@@ -1,4 +1,6 @@
+use std::path::PathBuf;
 use std::sync::mpsc::Sender;
+use std::sync::Mutex;
 
 use crate::{forge, minecraft, view, Instances, IoEvent, Opt, Paths};
 
@@ -16,7 +18,8 @@ pub struct Route {
 }
 
 pub struct App {
-    io_tx: Sender<IoEvent>,
+    // We need a mutex so we can send the app into the io thread - even if the io_tx is never actually used there
+    io_tx: Mutex<Sender<IoEvent>>,
     route_stack: Vec<Route>,
 
     pub home: view::home::State,
@@ -29,6 +32,7 @@ pub struct App {
     pub instances: Instances,
     pub paths: Paths,
     pub launcher: minecraft::Launcher,
+    pub java_home_overwrite: Option<PathBuf>,
 
     pub minecraft_version_manifest: Option<minecraft::VersionManifest>,
     pub forge_version_manifest: Option<forge::VersionManifest>,
@@ -46,7 +50,7 @@ impl App {
         )?;
 
         Ok(Self {
-            io_tx,
+            io_tx: Mutex::new(io_tx),
             route_stack: vec![Route {
                 id: RouteId::Home,
                 modal: false,
@@ -58,6 +62,7 @@ impl App {
             paths,
             instances,
             launcher,
+            java_home_overwrite: opt.java_home.clone(),
             hide_cursor: true,
             minecraft_version_manifest: None,
             forge_version_manifest: None,
@@ -66,7 +71,7 @@ impl App {
 
     /// Send a io event to the io thread
     pub fn dispatch(&mut self, action: IoEvent) {
-        self.io_tx.send(action).unwrap();
+        self.io_tx.lock().unwrap().send(action).unwrap();
     }
 
     pub fn push_route(&mut self, id: RouteId, modal: bool) {
