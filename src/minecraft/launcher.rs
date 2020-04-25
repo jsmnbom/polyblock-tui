@@ -210,10 +210,23 @@ impl Launcher {
 
     fn read(&self) -> ::anyhow::Result<LauncherConfig> {
         debug!("Reading launcher profiles.");
-        let file = fs::File::open(&self.launcher_profiles_path)
-            .context("Failed to open launcher profiles file.")?;
-        let reader = BufReader::new(file);
-        Ok(serde_json::from_reader(reader).context("Failed to read launcher profiles.")?)
+        match fs::File::open(&self.launcher_profiles_path) {
+            Ok(file) => {
+                let reader = BufReader::new(file);
+                Ok(serde_json::from_reader(reader).context("Failed to read launcher profiles.")?)
+            }
+            _ => Ok(LauncherConfig {
+                profiles: Default::default(),
+                settings: LauncherSettings {
+                    enable_historical: true,
+                    enable_snapshots: true,
+                    enable_releases: true,
+                    profile_sorting: "ByLastPlayed".to_string(),
+                    other: Default::default(),
+                },
+                other: Default::default(),
+            }),
+        }
     }
 
     fn write(&self, config: LauncherConfig) -> ::anyhow::Result<()> {
@@ -227,7 +240,6 @@ impl Launcher {
 
     pub fn ensure_profile(&self, instance: &Instance) -> ::anyhow::Result<()> {
         debug!("Ensuring launcher profile for {:?}", instance);
-        //TODO: WHat if the launcher profiles file wasn't created yet?
         let mut config = self.read()?;
 
         let uuid_key = instance.uuid.to_simple().to_string();
