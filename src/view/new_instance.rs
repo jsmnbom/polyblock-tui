@@ -1,7 +1,6 @@
 use tui::{
     layout::{Constraint, Rect},
-    style::{Color, Modifier, Style},
-    widgets::{Block, BorderType, Borders, Clear, Row, Table, TableState},
+    widgets::Row,
 };
 
 use super::common;
@@ -298,7 +297,6 @@ fn draw_enter_name(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
 
 pub fn draw_choose_minecraft_version(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
     let rect = util::centered_rect_percentage(90, 75, chunk);
-    f.render_widget(Clear, rect);
 
     let versions = &(app.minecraft_version_manifest.as_ref().unwrap().versions);
     // .iter()
@@ -333,36 +331,19 @@ pub fn draw_choose_minecraft_version(f: &mut UiFrame<'_>, app: &App, chunk: Rect
         })
         .collect();
 
-    let mut state = TableState::default();
-    state.select(Some(app.new_instance.selected - offset));
-
-    f.render_stateful_widget(
-        Table::new(
-            ["   Version id", "Type", "Release date"].iter(),
-            rows.into_iter(),
-        )
-        .block(
-            Block::default()
-                .title("Choose minecraft version")
-                .borders(Borders::ALL)
-                .border_type(BorderType::Plain),
-        )
-        .header_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD))
-        .widths(&[
+    common::draw_table(
+        f,
+        rect,
+        &["   Version id", "Type", "Release date"],
+        rows,
+        &[
             Constraint::Percentage(40),
             Constraint::Percentage(30),
             Constraint::Percentage(30),
-        ])
-        .style(Style::default())
-        .highlight_style(Style::default().fg(Color::Blue).modifier(Modifier::BOLD))
-        .highlight_symbol(">> ")
-        .column_spacing(1)
-        .header_gap(0),
-        rect,
-        &mut state,
-    );
-
-    RenderState::default()
+        ],
+        "Choose minecraft version",
+        Some(app.new_instance.selected - offset),
+    )
 }
 
 pub fn draw_forge_notice(f: &mut UiFrame<'_>, _app: &App, chunk: Rect) -> RenderState {
@@ -387,9 +368,9 @@ pub fn draw_choose_forge(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderS
 
 pub fn draw_choose_forge_version(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
     let rect = util::centered_rect_percentage(90, 75, chunk);
-    f.render_widget(Clear, rect);
 
     let versions = &(app.forge_version_manifest.as_ref().unwrap().versions);
+    // TODO: sort
 
     let offset = app
         .new_instance
@@ -430,27 +411,13 @@ pub fn draw_choose_forge_version(f: &mut UiFrame<'_>, app: &App, chunk: Rect) ->
         })
         .collect();
 
-    let mut table_state = TableState::default();
-    table_state.select(Some(app.new_instance.selected - offset));
-
-    f.render_stateful_widget(
-        Table::new(["   Version id", "Release date"].iter(), rows.into_iter())
-            .block(
-                Block::default()
-                    .title("Choose forge version")
-                    .borders(Borders::ALL)
-                    .border_type(BorderType::Plain),
-            )
-            .header_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD))
-            .widths(&[Constraint::Percentage(50), Constraint::Percentage(50)])
-            .style(Style::default())
-            .highlight_style(Style::default().fg(Color::Blue).modifier(Modifier::BOLD))
-            .highlight_symbol(">> ")
-            .column_spacing(1)
-            .header_gap(0),
+    common::draw_table(
+        f,
         rect,
-        &mut table_state,
-    );
-
-    RenderState::default()
+        &["   Version id", "Release date"],
+        rows,
+        &[Constraint::Percentage(50), Constraint::Percentage(50)],
+        "Choose forge version",
+        Some(app.new_instance.selected - offset),
+    )
 }
