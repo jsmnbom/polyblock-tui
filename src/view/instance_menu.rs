@@ -7,16 +7,17 @@ use tui::{
 
 use crate::{
     ui::{RenderState, UiFrame},
-    util, App, Instance, Key,
+    util, App, Instance, Key, RouteId, IoEvent
 };
 
 pub enum MenuOption {
     Play,
-    ManageMods,
-    ChangeMinecraftVersion,
-    ChangeForgeVersion,
-    AddForge,
-    RemoveForge,
+    PlayShowLog, // TODO
+    ManageMods, // TODO
+    ChangeMinecraftVersion, // TODO
+    ChangeForgeVersion, // TODO
+    AddForge, // TODO
+    RemoveForge, // TODO
     OpenDirectory,
     Rename,
     Remove,
@@ -26,6 +27,7 @@ impl fmt::Display for MenuOption {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             MenuOption::Play => write!(f, "Play"),
+            MenuOption::PlayShowLog => write!(f, "Play (show log)"),
             MenuOption::ManageMods => write!(f, "Manage mods"),
             MenuOption::ChangeMinecraftVersion => write!(f, "Change minecraft version"),
             MenuOption::ChangeForgeVersion => write!(f, "Change forge version"),
@@ -42,6 +44,7 @@ impl MenuOption {
     pub fn vanilla() -> Vec<Self> {
         vec![
             Self::Play,
+            Self::PlayShowLog,
             Self::ChangeMinecraftVersion,
             Self::AddForge,
             Self::OpenDirectory,
@@ -53,6 +56,7 @@ impl MenuOption {
     pub fn forge() -> Vec<Self> {
         vec![
             Self::Play,
+            Self::PlayShowLog,
             Self::ManageMods,
             Self::ChangeMinecraftVersion,
             Self::ChangeForgeVersion,
@@ -85,7 +89,27 @@ pub fn handle_key(key: Key, app: &mut App) {
             app.instance_menu.selected =
                 util::wrap_inc(app.instance_menu.selected, app.instance_menu.options.len())
         }
-        Key::Enter => {}
+        Key::Enter => match app.instance_menu.options[app.instance_menu.selected] {
+            MenuOption::Play => {
+                app.dispatch(IoEvent::PlayThenQuit)
+            }
+            MenuOption::Rename => {
+                let instance = app.instance_menu.instance.clone().unwrap();
+                app.rename_instance = Default::default();
+                app.rename_instance.instance = Some(instance.clone());
+                app.rename_instance.name_input = instance.name.clone();
+                app.pop_route();
+                app.push_route(RouteId::RenameInstance, true);
+            }
+            MenuOption::Remove => {
+                let instance = app.instance_menu.instance.clone().unwrap();
+                app.remove_instance = Default::default();
+                app.remove_instance.instance = Some(instance.clone());
+                app.pop_route();
+                app.push_route(RouteId::RemoveInstance, true);
+            }
+            _ => {}
+        },
         _ => {}
     }
 }

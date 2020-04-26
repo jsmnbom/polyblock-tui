@@ -4,7 +4,7 @@ use std::{fs, sync::Arc};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::{forge, minecraft, util, view, App, Instance};
+use crate::{cleanup_terminal, forge, minecraft, util, view, App, Instance};
 
 #[derive(Debug)]
 pub enum IoEvent {
@@ -13,6 +13,7 @@ pub enum IoEvent {
     CreateNewInstance,
     RemoveInstance,
     RenameInstance,
+    PlayThenQuit,
 }
 
 #[derive(Clone)]
@@ -184,6 +185,15 @@ impl<'a> Io<'a> {
                 app.instances.save()?;
 
                 app.launcher.ensure_profile(&instance)?;
+            }
+            PlayThenQuit => {
+                let app = self.app.read().await;
+                let instance = app.instance_menu.instance.clone().unwrap();
+
+                app.launcher.launch_instance(&instance)?;
+                // TODO: Signal to main thread to exit instead of doing it here on the io thread
+                cleanup_terminal();
+                std::process::exit(0);
             }
         }
 

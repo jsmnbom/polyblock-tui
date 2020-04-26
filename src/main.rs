@@ -35,7 +35,7 @@ use io::{Io, IoEvent};
 use paths::Paths;
 use util::{Event, Events, Key};
 
-fn cleanup_terminal() {
+pub fn cleanup_terminal() {
     disable_raw_mode().unwrap();
     execute!(stdout(), LeaveAlternateScreen, cursor::Show).unwrap();
 }
