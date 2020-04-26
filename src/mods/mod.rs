@@ -25,70 +25,70 @@ impl ModInfo {
         })
     }
 
-    pub fn print(&self, title: &str, full: bool) {
-        // TODO: Handle if file is missing
-        let file_info = self.file.as_ref();
-        let curse_info = self.curse.as_ref();
+    // pub fn print(&self, title: &str, full: bool) {
+    //     // TODO: Handle if file is missing
+    //     let file_info = self.file.as_ref();
+    //     let curse_info = self.curse.as_ref();
 
-        print!("{}", title);
+    //     print!("{}", title);
 
-        if let Some(file_info) = file_info {
-            print!(
-                " ({} found in {})",
-                file_info.sub_mods.len(),
-                match file_info.source {
-                    ModFileInfoSource::McModInfo => "mcmod.info",
-                    ModFileInfoSource::ModsToml => "mods.toml",
-                }
-            );
-        }
+    //     if let Some(file_info) = file_info {
+    //         print!(
+    //             " ({} found in {})",
+    //             file_info.sub_mods.len(),
+    //             match file_info.source {
+    //                 ModFileInfoSource::McModInfo => "mcmod.info",
+    //                 ModFileInfoSource::ModsToml => "mods.toml",
+    //             }
+    //         );
+    //     }
 
-        if let Some(curse_info) = curse_info {
-            if full {
-                print!(
-                    "\n  Curseforge ids:\n    project: {}\n    file: {}",
-                    curse_info.project_id, curse_info.id
-                );
-            } else {
-                print!(" (curseforge: {}/{})", curse_info.project_id, curse_info.id)
-            }
-        }
+    //     if let Some(curse_info) = curse_info {
+    //         if full {
+    //             print!(
+    //                 "\n  Curseforge ids:\n    project: {}\n    file: {}",
+    //                 curse_info.project_id, curse_info.id
+    //             );
+    //         } else {
+    //             print!(" (curseforge: {}/{})", curse_info.project_id, curse_info.id)
+    //         }
+    //     }
 
-        println!();
+    //     println!();
 
-        if file_info.is_none() {
-            println!("  WARNING: Missing file (consider using --repair to fix or remove the mod entirely).");
-        }
+    //     if file_info.is_none() {
+    //         println!("  WARNING: Missing file (consider using --repair to fix or remove the mod entirely).");
+    //     }
 
-        if let Some(file_info) = file_info {
-            let all_versions: Vec<Option<&String>> = file_info
-                .sub_mods
-                .iter()
-                .map(|m| m.version.as_ref())
-                .collect();
-            let versions_same = util::is_all_same(&all_versions);
-            if versions_same {
-                if let Some(Some(versions)) = all_versions.get(0) {
-                    println!("  version: {}", versions);
-                }
-            }
+    //     if let Some(file_info) = file_info {
+    //         let all_versions: Vec<Option<&String>> = file_info
+    //             .sub_mods
+    //             .iter()
+    //             .map(|m| m.version.as_ref())
+    //             .collect();
+    //         let versions_same = util::is_all_same(&all_versions);
+    //         if versions_same {
+    //             if let Some(Some(versions)) = all_versions.get(0) {
+    //                 println!("  version: {}", versions);
+    //             }
+    //         }
 
-            for m in file_info.sub_mods.iter() {
-                print!("- {}", m.mod_id);
-                if let Some(name) = &m.name {
-                    println!(" ({})", name);
-                }
-                if !versions_same {
-                    if let Some(version) = &m.version {
-                        println!("    version: {}", version);
-                    }
-                }
-                if full {
-                    if let Some(authors) = &m.authors {
-                        println!("    author(s): {}", authors);
-                    }
-                }
-            }
-        }
-    }
+    //         for m in file_info.sub_mods.iter() {
+    //             print!("- {}", m.mod_id);
+    //             if let Some(name) = &m.name {
+    //                 println!(" ({})", name);
+    //             }
+    //             if !versions_same {
+    //                 if let Some(version) = &m.version {
+    //                     println!("    version: {}", version);
+    //                 }
+    //             }
+    //             if full {
+    //                 if let Some(authors) = &m.authors {
+    //                     println!("    author(s): {}", authors);
+    //                 }
+    //             }
+    //         }
+    //     }
+    // }
 }

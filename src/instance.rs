@@ -229,21 +229,4 @@ impl Instances {
         serde_json::to_writer(writer, &data).context("Tried to save malformed instance data.")?;
         Ok(())
     }
-
-    pub fn find_instance_by_name(&self, instance_name: &str) -> ::anyhow::Result<&Instance> {
-        Ok(self
-            .inner
-            .get(instance_name)
-            .ok_or(anyhow!("Could not find instance with that name."))?)
-    }
-
-    pub fn find_instance_by_name_mut(
-        &mut self,
-        instance_name: &str,
-    ) -> ::anyhow::Result<&mut Instance> {
-        Ok(self
-            .inner
-            .get_mut(instance_name)
-            .ok_or(anyhow!("Could not find instance with that name."))?)
-    }
 }

@@ -2,7 +2,6 @@ use anyhow::Context;
 use bytes::Buf;
 use data_encoding::HEXLOWER;
 use futures::stream::StreamExt;
-use log::trace;
 use sha1::{Digest, Sha1};
 use std::{
     fs,
