@@ -7,17 +7,17 @@ use tui::{
 
 use crate::{
     ui::{RenderState, UiFrame},
-    util, App, Instance, Key, RouteId, IoEvent
+    util, App, Instance, IoEvent, Key, RouteId,
 };
 
 pub enum MenuOption {
     Play,
-    PlayShowLog, // TODO
-    ManageMods, // TODO
+    PlayShowLog,            // TODO
+    ManageMods,             // TODO
     ChangeMinecraftVersion, // TODO
-    ChangeForgeVersion, // TODO
-    AddForge, // TODO
-    RemoveForge, // TODO
+    ChangeForgeVersion,     // TODO
+    AddForge,               // TODO
+    RemoveForge,            // TODO
     OpenDirectory,
     Rename,
     Remove,
@@ -90,8 +90,12 @@ pub fn handle_key(key: Key, app: &mut App) {
                 util::wrap_inc(app.instance_menu.selected, app.instance_menu.options.len())
         }
         Key::Enter => match app.instance_menu.options[app.instance_menu.selected] {
-            MenuOption::Play => {
-                app.dispatch(IoEvent::PlayThenQuit)
+            MenuOption::Play => app.dispatch(IoEvent::PlayThenQuit),
+            MenuOption::OpenDirectory => {
+                let instance = app.instance_menu.instance.as_ref().unwrap();
+                let directory = instance.directory();
+                open::that(directory).unwrap();
+                app.pop_route();
             }
             MenuOption::Rename => {
                 let instance = app.instance_menu.instance.clone().unwrap();
