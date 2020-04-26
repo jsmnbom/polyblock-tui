@@ -1,16 +1,10 @@
-use crossterm::{cursor::MoveTo, execute};
-use log::debug;
-use std::{
-    io::{self, Write},
-    iter,
-};
 use tui::{
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, BorderType, Borders, Clear, Gauge, Paragraph, Row, Table, TableState, Text},
+    widgets::{Block, BorderType, Borders, Clear, Row, Table, TableState},
 };
-use unicode_width::UnicodeWidthStr;
 
+use super::common;
 use crate::{
     forge, minecraft,
     ui::{RenderState, UiFrame},
@@ -100,8 +94,10 @@ pub fn handle_key(key: Key, app: &mut App) {
                     app.new_instance.name_input.pop();
                 }
                 Key::Enter => {
-                    app.dispatch(IoEvent::FetchMinecraftVersionManifest);
-                    app.new_instance.inner = InnerState::FetchMinecraftVersionManifest;
+                    if app.new_instance.error.is_none() {
+                        app.dispatch(IoEvent::FetchMinecraftVersionManifest);
+                        app.new_instance.inner = InnerState::FetchMinecraftVersionManifest;
+                    }
                 }
                 _ => {}
             }
@@ -277,125 +273,27 @@ pub async fn draw(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
     }
 }
 
-fn draw_enter_name(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
-    let state = &app.new_instance;
-
-    let rect = util::centered_rect_percentage_dir(Direction::Horizontal, 30, chunk);
-    let rect = util::centered_rect_dir(
-        Direction::Vertical,
-        if state.error.is_some() { 4 } else { 3 },
-        rect,
-    );
-    f.render_widget(Clear, rect);
-
-    let mut text = vec![Text::raw(&state.name_input)];
-    if let Some(error) = &state.error {
-        text.push(Text::raw("\n\r"));
-        text.push(Text::styled(error, Style::default().fg(Color::Red)));
-    }
-
-    f.render_widget(
-        Paragraph::new(text.iter())
-            .style(Style::default().fg(Color::Yellow))
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_type(BorderType::Plain)
-                    .title("Enter new instance name"),
-            ),
-        rect,
-    );
-
-    execute!(
-        io::stdout(),
-        MoveTo(
-            rect.x + 1 + ((&state.name_input).width() as u16),
-            rect.y + 1
-        )
+async fn draw_loading(f: &mut UiFrame<'_>, app: &App, chunk: Rect, msg: &str) -> RenderState {
+    common::draw_loading_dialog(
+        f,
+        chunk,
+        msg,
+        &[
+            app.new_instance.progress_main.as_ref(),
+            app.new_instance.progress_sub.as_ref(),
+        ],
     )
-    .ok();
-
-    RenderState::default().show_cursor()
+    .await
 }
 
-async fn draw_loading(f: &mut UiFrame<'_>, app: &App, chunk: Rect, msg: &str) -> RenderState {
-    let rect = util::centered_rect_percentage_dir(Direction::Horizontal, 50, chunk);
-    let mut height: u16 = 5;
-    let mut to_draw: Vec<(f64, String)> = Vec::new();
-    for progress in &[
-        app.new_instance.progress_main.as_ref(),
-        app.new_instance.progress_sub.as_ref(),
-    ] {
-        if let Some(progress) = progress {
-            let msg = progress.get_msg().await;
-            let ratio = progress.get().await;
-
-            height += 2;
-            if !msg.is_empty() {
-                height += 1;
-            }
-            to_draw.push((ratio, msg));
-        };
-    }
-
-    let rect = util::centered_rect_dir(Direction::Vertical, height, rect);
-    f.render_widget(Clear, rect);
-    f.render_widget(
-        Block::default()
-            .borders(Borders::ALL)
-            .border_type(BorderType::Plain),
-        rect,
-    );
-
-    let layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(
-            iter::repeat(Constraint::Length(1))
-                .take((height - 4) as usize)
-                .collect::<Vec<_>>(),
-        )
-        .margin(2)
-        .split(rect);
-
-    f.render_widget(
-        Paragraph::new([Text::raw(msg)].iter())
-            .style(Style::default().fg(Color::Yellow))
-            .alignment(Alignment::Center),
-        layout[0],
-    );
-
-    let mut i: usize = 2;
-
-    for (ratio, msg) in to_draw {
-        let label = format!("{:.0}%", (ratio * 100.0));
-        debug!("Ratio {:?}, msg: {:?}, label: {:?}", ratio, msg, label);
-        f.render_widget(
-            Gauge::default()
-                .style(
-                    Style::default()
-                        .fg(Color::White)
-                        .bg(Color::Black)
-                        .modifier(Modifier::ITALIC),
-                )
-                .label(&label)
-                .ratio(ratio),
-            layout[i],
-        );
-
-        if !msg.is_empty() {
-            i += 1;
-            f.render_widget(
-                Paragraph::new([Text::raw(msg)].iter())
-                    .style(Style::default().fg(Color::Yellow))
-                    .alignment(Alignment::Center),
-                layout[i],
-            );
-        }
-
-        i += 2;
-    }
-
-    RenderState::default()
+fn draw_enter_name(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
+    common::draw_input_dialog(
+        f,
+        chunk,
+        "Enter new instance name",
+        &app.new_instance.name_input,
+        app.new_instance.error.as_deref(),
+    )
 }
 
 pub fn draw_choose_minecraft_version(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
@@ -468,132 +366,23 @@ pub fn draw_choose_minecraft_version(f: &mut UiFrame<'_>, app: &App, chunk: Rect
 }
 
 pub fn draw_forge_notice(f: &mut UiFrame<'_>, _app: &App, chunk: Rect) -> RenderState {
-    let rect = util::centered_rect_percentage_dir(Direction::Horizontal, 60, chunk);
-    let rect = util::centered_rect_dir(Direction::Vertical, 10, rect);
-
-    let layout = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(1)
-        .constraints(
-            [
-                Constraint::Length(6),
-                Constraint::Length(1),
-                Constraint::Length(1),
-            ]
-            .as_ref(),
-        )
-        .split(rect);
-
     let text = "Forge is an open source project that mostly relies on ad revenue.
 By using Polyblock you bypass viewing these ads.
 Please strongly consider supporting the creator of Forge LexManos' Patreon.
 https://www.patreon.com/LexManos";
-
-    f.render_widget(Clear, rect);
-    f.render_widget(
-        Block::default()
-            .borders(Borders::ALL)
-            .border_type(BorderType::Plain),
-        rect,
-    );
-    f.render_widget(
-        Paragraph::new([Text::raw(text)].iter())
-            .alignment(Alignment::Center)
-            .style(Style::default().fg(Color::Yellow))
-            .wrap(true),
-        layout[0],
-    );
-
-    let button_layout = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints(
-            [
-                Constraint::Length((layout[2].width - 6) / 2),
-                Constraint::Length(6),
-                Constraint::Length((layout[2].width / 6) / 2),
-            ]
-            .as_ref(),
-        )
-        .split(layout[2]);
-
-    f.render_widget(
-        Paragraph::new(vec![Text::raw("[ Ok ]")].iter())
-            .style(Style::default().fg(Color::Blue).modifier(Modifier::BOLD)),
-        button_layout[1],
-    );
-
-    RenderState::default()
+    common::draw_button_dialog(f, chunk, 10, text, vec!["[ Ok ]"], 0)
 }
 
 pub fn draw_choose_forge(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
-    let rect = util::centered_rect_percentage_dir(Direction::Horizontal, 60, chunk);
-    let rect = util::centered_rect_dir(Direction::Vertical, 10, rect);
-
-    f.render_widget(Clear, rect);
-    f.render_widget(
-        Block::default()
-            .borders(Borders::ALL)
-            .border_type(BorderType::Plain),
-        rect,
-    );
-
-    let layout = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(1)
-        .constraints(
-            [
-                Constraint::Length(6),
-                Constraint::Length(1),
-                Constraint::Length(1),
-            ]
-            .as_ref(),
-        )
-        .split(rect);
-
-    let text = vec![Text::raw("You will need a forge version to be able to install mods. Using the recommended version is usually a good idea unless you know you need another version. Would you like to install forge for this instance?")];
-
-    f.render_widget(
-        Paragraph::new(text.iter())
-            .alignment(Alignment::Center)
-            .style(Style::default().fg(Color::Yellow))
-            .wrap(true),
-        layout[0],
-    );
-
-    let button_layout = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints(
-            [
-                Constraint::Length((layout[2].width - 16) / 2),
-                Constraint::Length(7),
-                Constraint::Length(3),
-                Constraint::Length(6),
-                Constraint::Length((layout[2].width / 16) / 2),
-            ]
-            .as_ref(),
-        )
-        .split(layout[2]);
-
-    f.render_widget(
-        Paragraph::new(vec![Text::raw("[ Yes ]")].iter()).style(
-            if app.new_instance.selected == 0 {
-                Style::default().fg(Color::Blue).modifier(Modifier::BOLD)
-            } else {
-                Style::default().modifier(Modifier::DIM)
-            },
-        ),
-        button_layout[1],
-    );
-    f.render_widget(
-        Paragraph::new(vec![Text::raw("[ No ]")].iter()).style(if app.new_instance.selected != 0 {
-            Style::default().fg(Color::Blue).modifier(Modifier::BOLD)
-        } else {
-            Style::default().modifier(Modifier::DIM)
-        }),
-        button_layout[3],
-    );
-
-    RenderState::default()
+    let text = "You will need a forge version to be able to install mods. Using the recommended version is usually a good idea unless you know you need another version. Would you like to install forge for this instance?";
+    common::draw_button_dialog(
+        f,
+        chunk,
+        10,
+        text,
+        vec!["[ Yes ]", "[ No ]"],
+        app.new_instance.selected,
+    )
 }
 
 pub fn draw_choose_forge_version(f: &mut UiFrame<'_>, app: &App, chunk: Rect) -> RenderState {
