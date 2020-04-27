@@ -8,30 +8,13 @@ use tui::{
     Frame,
 };
 
-use crate::{view, App, RouteId};
+use crate::App;
 
 pub type UiFrame<'a> = Frame<'a, CrosstermBackend<Stdout>>;
 
-pub struct RenderState {
-    hide_cursor: bool,
-}
-
-impl Default for RenderState {
-    fn default() -> Self {
-        Self { hide_cursor: true }
-    }
-}
-
-impl RenderState {
-    pub fn show_cursor(mut self) -> Self {
-        self.hide_cursor = false;
-        self
-    }
-}
-
-pub async fn draw_layout(f: &mut UiFrame<'_>, app: &mut App) {
+pub async fn draw_layout(f: &mut UiFrame<'_>, app: &mut App) -> ::anyhow::Result<()> {
     let instant = Instant::now();
-    let routes = app.get_current_routes();
+    let routes: Vec<_> = app.get_current_routes().into_iter().cloned().collect();
 
     let parent_layout = Layout::default()
         .direction(Direction::Vertical)
@@ -39,42 +22,33 @@ pub async fn draw_layout(f: &mut UiFrame<'_>, app: &mut App) {
         .margin(0)
         .split(f.size());
 
-    let raw_help = match routes.last().unwrap().id {
-        RouteId::Home => view::home::get_help(app),
-        RouteId::InstanceMenu => view::instance_menu::get_help(app),
-        RouteId::NewInstance => view::new_instance::get_help(app),
-        RouteId::RemoveInstance => view::remove_instance::get_help(app),
-        RouteId::RenameInstance => view::rename_instance::get_help(app),
-    };
+    for (i, route) in routes.iter().enumerate() {
+        let implementation = route.get_impl();
+        Some(implementation.draw(f, app, parent_layout[0]).await);
 
-    let help = raw_help
-        .iter()
-        .map(|(key, text)| {
-            vec![
-                Text::styled(key.clone(), Style::default().modifier(Modifier::BOLD)),
-                Text::raw(" "),
-                Text::raw(text.clone()),
-            ]
-        })
-        .collect::<Vec<_>>()
-        .join(&Text::raw("   "));
+        if i == routes.len() - 1 {
+            let raw_help = implementation.get_help(app);
 
-    f.render_widget(
-        Paragraph::new(help.iter()).style(Style::default().fg(Color::White)),
-        parent_layout[1],
-    );
+            let help = raw_help
+                .iter()
+                .map(|(key, text)| {
+                    vec![
+                        Text::styled(key.clone(), Style::default().modifier(Modifier::BOLD)),
+                        Text::raw(" "),
+                        Text::raw(text.clone()),
+                    ]
+                })
+                .collect::<Vec<_>>()
+                .join(&Text::raw("   "));
 
-    let mut render_state = None;
-    for route in routes.iter() {
-        render_state = Some(match route.id {
-            RouteId::Home => view::home::draw(f, app, parent_layout[0]),
-            RouteId::InstanceMenu => view::instance_menu::draw(f, app, parent_layout[0]),
-            RouteId::NewInstance => view::new_instance::draw(f, app, parent_layout[0]).await,
-            RouteId::RemoveInstance => view::remove_instance::draw(f, app, parent_layout[0]),
-            RouteId::RenameInstance => view::rename_instance::draw(f, app, parent_layout[0]),
-        });
+            f.render_widget(
+                Paragraph::new(help.iter()).style(Style::default().fg(Color::White)),
+                parent_layout[1],
+            );
+        }
     }
-    app.hide_cursor = render_state.unwrap().hide_cursor;
 
     trace!("Drawing took {:?}", instant.elapsed());
+
+    Ok(())
 }

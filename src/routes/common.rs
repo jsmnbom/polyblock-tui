@@ -12,10 +12,7 @@ use tui::{
 
 use unicode_width::UnicodeWidthStr;
 
-use crate::{
-    ui::{RenderState, UiFrame},
-    util,
-};
+use crate::{ui::UiFrame, util};
 
 pub fn draw_button_dialog(
     f: &mut UiFrame<'_>,
@@ -24,7 +21,7 @@ pub fn draw_button_dialog(
     text: &str,
     buttons: Vec<&str>,
     selected_button_i: usize,
-) -> RenderState {
+) {
     let rect = util::centered_rect_percentage_dir(Direction::Horizontal, 60, chunk);
     let rect = util::centered_rect_dir(Direction::Vertical, height, rect);
 
@@ -82,8 +79,6 @@ pub fn draw_button_dialog(
             button_layout[(i * 2) + 1],
         );
     }
-
-    RenderState::default()
 }
 
 pub fn draw_input_dialog(
@@ -92,7 +87,7 @@ pub fn draw_input_dialog(
     title: &str,
     entered_text: &str,
     error: Option<&str>,
-) -> RenderState {
+) {
     let rect = util::centered_rect_percentage_dir(Direction::Horizontal, 30, chunk);
     let rect = util::centered_rect_dir(
         Direction::Vertical,
@@ -124,8 +119,6 @@ pub fn draw_input_dialog(
         MoveTo(rect.x + 1 + (entered_text.width() as u16), rect.y + 1)
     )
     .ok();
-
-    RenderState::default().show_cursor()
 }
 
 pub async fn draw_loading_dialog(
@@ -133,7 +126,7 @@ pub async fn draw_loading_dialog(
     chunk: Rect,
     msg: &str,
     progress: &[Option<&util::Progress>],
-) -> RenderState {
+) {
     let rect = util::centered_rect_percentage_dir(Direction::Horizontal, 50, chunk);
     let mut height: u16 = 5;
     let mut to_draw: Vec<(f64, String)> = Vec::new();
@@ -206,8 +199,6 @@ pub async fn draw_loading_dialog(
 
         i += 2;
     }
-
-    RenderState::default()
 }
 
 pub fn draw_table<D>(
@@ -216,10 +207,9 @@ pub fn draw_table<D>(
     header: &[&str],
     rows: Vec<Row<D>>,
     widths: &[Constraint],
-    title: &str,
+    title: Option<&str>,
     selected: Option<usize>,
-) -> RenderState
-where
+) where
     D: Iterator,
     D::Item: std::fmt::Display,
 {
@@ -228,23 +218,23 @@ where
     let mut state = TableState::default();
     state.select(selected);
 
-    f.render_stateful_widget(
-        Table::new(header.iter(), rows.into_iter())
-            .block(
-                Block::default()
-                    .title(title)
-                    .borders(Borders::ALL)
-                    .border_type(BorderType::Plain),
-            )
-            .header_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD))
-            .widths(widths)
-            .style(Style::default())
-            .highlight_style(Style::default().fg(Color::Blue).modifier(Modifier::BOLD))
-            .highlight_symbol(">> ")
-            .column_spacing(1)
-            .header_gap(0),
-        chunk,
-        &mut state,
-    );
-    RenderState::default()
+    let mut table = Table::new(header.iter(), rows.into_iter())
+        .header_style(Style::default().fg(Color::Yellow).modifier(Modifier::BOLD))
+        .widths(widths)
+        .style(Style::default())
+        .highlight_style(Style::default().fg(Color::Blue).modifier(Modifier::BOLD))
+        .highlight_symbol(">> ")
+        .column_spacing(1)
+        .header_gap(0);
+
+    if let Some(title) = title {
+        table = table.block(
+            Block::default()
+                .title(title)
+                .borders(Borders::ALL)
+                .border_type(BorderType::Plain),
+        );
+    }
+
+    f.render_stateful_widget(table, chunk, &mut state);
 }

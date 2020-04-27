@@ -25,14 +25,15 @@ mod io;
 mod minecraft;
 mod mods;
 mod paths;
+mod routes;
 mod ui;
 mod util;
-mod view;
 
-use app::{App, RouteId};
+use app::App;
 use instance::{Instance, Instances};
 use io::{Io, IoEvent};
 use paths::Paths;
+use routes::Route;
 use util::{Event, Events, Key};
 
 pub fn cleanup_terminal() {
@@ -121,11 +122,12 @@ async fn main() -> ::anyhow::Result<()> {
     loop {
         {
             let mut app = cloned_app.write().await;
+            app.hide_cursor = true;
 
             // Replicate start of terminal.draw so we can draw async
             terminal.autoresize()?;
             let mut frame = terminal.get_frame();
-            ui::draw_layout(&mut frame, &mut app).await;
+            ui::draw_layout(&mut frame, &mut app).await?;
             terminal.draw(|_| {})?;
 
             #[allow(irrefutable_let_patterns)]

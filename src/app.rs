@@ -2,33 +2,16 @@ use std::path::PathBuf;
 use std::sync::mpsc::Sender;
 use std::sync::Mutex;
 
-use crate::{forge, minecraft, view, Instances, IoEvent, Opt, Paths};
+use crate::{forge, minecraft, routes, Instances, IoEvent, Opt, Paths, Route};
 
-#[derive(Clone)]
-pub enum RouteId {
-    Home,
-    InstanceMenu,
-    NewInstance,
-    RemoveInstance,
-    RenameInstance,
-}
 
-#[derive(Clone)]
-pub struct Route {
-    pub id: RouteId,
-    modal: bool,
-}
 
 pub struct App {
     // We need a mutex so we can send the app into the io thread - even if the io_tx is never actually used there
     io_tx: Mutex<Sender<IoEvent>>,
     route_stack: Vec<Route>,
 
-    pub home: view::home::State,
-    pub instance_menu: view::instance_menu::State,
-    pub new_instance: view::new_instance::State,
-    pub remove_instance: view::remove_instance::State,
-    pub rename_instance: view::rename_instance::State,
+    pub state: routes::State,
 
     pub should_quit: bool,
     pub hide_cursor: bool,
@@ -55,15 +38,8 @@ impl App {
 
         Ok(Self {
             io_tx: Mutex::new(io_tx),
-            route_stack: vec![Route {
-                id: RouteId::Home,
-                modal: false,
-            }],
-            home: Default::default(),
-            instance_menu: Default::default(),
-            new_instance: Default::default(),
-            remove_instance: Default::default(),
-            rename_instance: Default::default(),
+            route_stack: vec![Route::Home],
+            state: Default::default(),
             should_quit: false,
             paths,
             instances,
@@ -76,12 +52,12 @@ impl App {
     }
 
     /// Send a io event to the io thread
-    pub fn dispatch(&mut self, action: IoEvent) {
+    pub fn dispatch(&self, action: IoEvent) {
         self.io_tx.lock().unwrap().send(action).unwrap();
     }
 
-    pub fn push_route(&mut self, id: RouteId, modal: bool) {
-        self.route_stack.push(Route { id, modal });
+    pub fn push_route(&mut self, route: Route) {
+        self.route_stack.push(route);
     }
 
     pub fn pop_route(&mut self) -> Option<Route> {
@@ -96,15 +72,9 @@ impl App {
         let mut routes = Vec::new();
         for route in self.route_stack.iter().rev() {
             routes.push(route);
-            if !route.modal {
-                break;
-            }
-        }
-        if routes.is_empty() {
-            routes.push(&Route {
-                id: RouteId::Home,
-                modal: false,
-            });
+            // if !route.modal {
+            //     break;
+            // }
         }
         routes.reverse();
         routes
@@ -112,5 +82,9 @@ impl App {
 
     pub fn quit(&mut self) {
         self.should_quit = true;
+    }
+
+    pub fn show_cursor(&mut self) {
+        self.hide_cursor = false;
     }
 }

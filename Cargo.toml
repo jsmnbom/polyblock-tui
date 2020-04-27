@@ -33,6 +33,7 @@ futures = "0.3.4"
 better-panic = "0.2.0"
 bytes = "0.5.4"
 open = "1.4.0"
+async-trait = "0.1.30"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winreg = "0.7"

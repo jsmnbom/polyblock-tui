@@ -4,7 +4,7 @@ use std::{fs, sync::Arc};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use crate::{cleanup_terminal, forge, minecraft, util, view, App, Instance};
+use crate::{forge, minecraft, routes, util, App, Instance};
 
 #[derive(Debug)]
 pub enum IoEvent {
@@ -37,7 +37,7 @@ impl<'a> Io<'a> {
                     let (data_file_path, pb) = {
                         let mut app = self.app.write().await;
                         let pb = util::Progress::new();
-                        app.new_instance.progress_main = Some(pb.clone());
+                        app.state.new_instance.progress_main = Some(pb.clone());
                         (app.paths.file.minecraft_versions_cache.clone(), pb)
                     };
 
@@ -47,8 +47,8 @@ impl<'a> Io<'a> {
 
                     self.app.write().await.minecraft_version_manifest = Some(manifest);
                 }
-                self.app.write().await.new_instance.inner =
-                    view::new_instance::InnerState::ChooseMinecraftVersion;
+                self.app.write().await.state.new_instance.inner =
+                    routes::new_instance::InnerState::ChooseMinecraftVersion;
             }
             FetchForgeVersionManifest => {
                 let exists = { self.app.read().await.forge_version_manifest.is_none() };
@@ -56,7 +56,7 @@ impl<'a> Io<'a> {
                     let (data_file_path, pb) = {
                         let mut app = self.app.write().await;
                         let pb = util::Progress::new();
-                        app.new_instance.progress_main = Some(pb.clone());
+                        app.state.new_instance.progress_main = Some(pb.clone());
                         (app.paths.file.forge_versions_cache.clone(), pb)
                     };
 
@@ -64,24 +64,28 @@ impl<'a> Io<'a> {
                         forge::VersionManifest::fetch(&pb, &self.client, &data_file_path).await?;
                     self.app.write().await.forge_version_manifest = Some(manifest);
                 }
-                self.app.write().await.new_instance.inner =
-                    view::new_instance::InnerState::ChooseForgeVersion;
+                self.app.write().await.state.new_instance.inner =
+                    routes::new_instance::InnerState::ChooseForgeVersion;
             }
             CreateNewInstance => {
                 let (name, instance) = {
                     let (minecraft_version, forge_version, name, instances_directory) = {
                         let app = self.app.read().await;
                         (
-                            app.new_instance.chosen_minecraft_version.clone().unwrap(),
-                            app.new_instance.chosen_forge_version.clone(),
-                            app.new_instance.name_input.clone(),
+                            app.state
+                                .new_instance
+                                .chosen_minecraft_version
+                                .clone()
+                                .unwrap(),
+                            app.state.new_instance.chosen_forge_version.clone(),
+                            app.state.new_instance.name_input.clone(),
                             app.paths.directory.instances.clone(),
                         )
                     };
                     let main_pb = {
                         let mut app = self.app.write().await;
                         let pb = util::Progress::new();
-                        app.new_instance.progress_main = Some(pb.clone());
+                        app.state.new_instance.progress_main = Some(pb.clone());
                         pb
                     };
 
@@ -90,7 +94,7 @@ impl<'a> Io<'a> {
                         let sub_pb = {
                             let mut app = self.app.write().await;
                             let pb = util::Progress::new();
-                            app.new_instance.progress_sub = Some(pb.clone());
+                            app.state.new_instance.progress_sub = Some(pb.clone());
                             pb
                         };
 
@@ -140,7 +144,7 @@ impl<'a> Io<'a> {
                     (name, instance)
                 };
                 let mut app = self.app.write().await;
-                let main_pb = &app.new_instance.progress_main.as_ref().unwrap();
+                let main_pb = &app.state.new_instance.progress_main.as_ref().unwrap();
 
                 main_pb.inc_with_msg(1, "Ensuring launcher profile.").await;
 
@@ -156,7 +160,7 @@ impl<'a> Io<'a> {
             RemoveInstance => {
                 let instance = {
                     let app = self.app.read().await;
-                    let instance = app.remove_instance.instance.clone().unwrap();
+                    let instance = app.state.remove_instance.instance.clone().unwrap();
 
                     debug!("Removing launcher profile.");
                     app.launcher.remove_profile(&instance)?;
@@ -173,10 +177,10 @@ impl<'a> Io<'a> {
             }
             RenameInstance => {
                 let mut app = self.app.write().await;
-                let mut instance = app.rename_instance.instance.clone().unwrap();
+                let mut instance = app.state.rename_instance.instance.clone().unwrap();
 
                 let old_name = instance.name;
-                instance.name = app.rename_instance.name_input.clone();
+                instance.name = app.state.rename_instance.name_input.clone();
 
                 app.instances.inner.remove(&old_name);
                 app.instances
@@ -187,13 +191,14 @@ impl<'a> Io<'a> {
                 app.launcher.ensure_profile(&instance)?;
             }
             PlayThenQuit => {
-                let app = self.app.read().await;
-                let instance = app.instance_menu.instance.clone().unwrap();
+                {
+                    let app = self.app.read().await;
+                    let instance = app.state.instance_menu.instance.clone().unwrap();
 
-                app.launcher.launch_instance(&instance)?;
-                // TODO: Signal to main thread to exit instead of doing it here on the io thread
-                cleanup_terminal();
-                std::process::exit(0);
+                    app.launcher.launch_instance(&instance)?;
+                }
+                let mut app = self.app.write().await;
+                app.quit();
             }
         }
 
