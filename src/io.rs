@@ -17,6 +17,8 @@ pub enum IoEvent {
     AddForgeFetchVersionManifests,
     AddForge,
     RemoveForge,
+    ChangeVersion,
+    ChangeVersionFetchMinecraftVersionManifest,
 }
 
 #[derive(Clone)]
@@ -52,6 +54,39 @@ impl<'a> Io<'a> {
                 }
                 self.app.write().await.state.new_instance.inner =
                     routes::new_instance::InnerState::ChooseMinecraftVersion;
+            }
+            ChangeVersionFetchMinecraftVersionManifest => {
+                let exists = { self.app.read().await.minecraft_version_manifest.is_some() };
+                if !exists {
+                    let (data_file_path, pb) = {
+                        let mut app = self.app.write().await;
+                        let pb = util::Progress::new();
+                        app.state.change_version.progress = Some(pb.clone());
+                        (app.paths.file.minecraft_versions_cache.clone(), pb)
+                    };
+
+                    let manifest =
+                        minecraft::VersionManifest::fetch(&pb, &self.client, &data_file_path)
+                            .await?;
+
+                    self.app.write().await.minecraft_version_manifest = Some(manifest);
+                }
+                let mut app = self.app.write().await;
+                if app
+                    .state
+                    .change_version
+                    .instance
+                    .as_ref()
+                    .unwrap()
+                    .forge_name
+                    .is_some()
+                {
+                    app.state.change_version.inner =
+                        routes::change_version::InnerState::ForgeWarning;
+                } else {
+                    app.state.change_version.inner =
+                        routes::change_version::InnerState::ChooseVersion;
+                }
             }
             NewInstanceFetchForgeVersionManifest => {
                 let exists = { self.app.read().await.forge_version_manifest.is_some() };
@@ -308,9 +343,26 @@ impl<'a> Io<'a> {
 
                 app.launcher.ensure_profile(&instance)?;
 
-                app.instances
-                    .inner
-                    .insert(instance.name.clone(), instance);
+                app.instances.inner.insert(instance.name.clone(), instance);
+                app.instances.save()?;
+                app.pop_route();
+            }
+            ChangeVersion => {
+                let mut app = self.app.write().await;
+                let mut instance = app.state.change_version.instance.clone().unwrap();
+                instance.version_id = app
+                    .state
+                    .change_version
+                    .chosen_version
+                    .as_ref()
+                    .unwrap()
+                    .id
+                    .clone();
+                instance.forge_name = None;
+
+                app.launcher.ensure_profile(&instance)?;
+
+                app.instances.inner.insert(instance.name.clone(), instance);
                 app.instances.save()?;
                 app.pop_route();
             }

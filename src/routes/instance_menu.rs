@@ -147,6 +147,13 @@ impl RouteImpl for Impl {
                 MenuOption::RemoveForge => {
                     app.dispatch(IoEvent::RemoveForge);
                 }
+                MenuOption::ChangeMinecraftVersion => {
+                    let instance = app.state.instance_menu.instance.clone().unwrap();
+                    app.state.change_version = change_version::State::new(instance);
+                    app.dispatch(IoEvent::ChangeVersionFetchMinecraftVersionManifest);
+                    app.pop_route();
+                    app.push_route(Route::ChangeVersion);
+                }
                 _ => {}
             },
             _ => {}

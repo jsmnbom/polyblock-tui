@@ -139,7 +139,7 @@ impl RouteImpl for Impl {
                 draw_loading(f, app, chunk, "Loading version manifests...").await
             }
             InnerState::ChooseForgeVersion => draw_choose_forge_version(f, app, chunk),
-            InnerState::Install => draw_loading(f, app, chunk, "Creating your new instance").await,
+            InnerState::Install => draw_loading(f, app, chunk, "Updating your instance.").await,
         }
     }
 }
