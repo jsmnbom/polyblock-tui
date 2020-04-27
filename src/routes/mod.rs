@@ -4,6 +4,7 @@ pub mod instance_menu;
 pub mod new_instance;
 pub mod remove_instance;
 pub mod rename_instance;
+pub mod add_forge;
 
 use async_trait::async_trait;
 use tui::layout::Rect;
@@ -25,6 +26,7 @@ pub enum Route {
     RemoveInstance,
     NewInstance,
     InstanceMenu,
+    AddForge
 }
 
 impl Route {
@@ -37,6 +39,7 @@ impl Route {
             RemoveInstance => Box::new(remove_instance::Impl {}),
             NewInstance => Box::new(new_instance::Impl {}),
             InstanceMenu => Box::new(instance_menu::Impl {}),
+            AddForge => Box::new(add_forge::Impl {}),
         }
     }
 }
@@ -48,4 +51,6 @@ pub struct State {
     pub remove_instance: remove_instance::State,
     pub new_instance: new_instance::State,
     pub instance_menu: instance_menu::State,
+    pub add_forge: add_forge::State,
 }
+

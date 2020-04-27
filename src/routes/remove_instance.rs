@@ -4,7 +4,6 @@ use tui::layout::Rect;
 use super::*;
 use crate::{util, Instance, IoEvent};
 
-#[derive(Clone)]
 pub struct State {
     pub instance: Option<Instance>,
     pub selected: usize,
@@ -65,7 +64,6 @@ impl RouteImpl for Impl {
                 if app.state.remove_instance.selected == 0 {
                     app.dispatch(IoEvent::RemoveInstance);
                 }
-                app.pop_route();
             }
             _ => {}
         }

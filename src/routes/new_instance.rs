@@ -97,7 +97,7 @@ impl RouteImpl for Impl {
                     }
                     Key::Enter => {
                         if app.state.new_instance.error.is_none() {
-                            app.dispatch(IoEvent::FetchMinecraftVersionManifest);
+                            app.dispatch(IoEvent::NewInstanceFetchMinecraftVersionManifest);
                             app.state.new_instance.inner =
                                 InnerState::FetchMinecraftVersionManifest;
                         }
@@ -175,7 +175,7 @@ impl RouteImpl for Impl {
                     app.state.new_instance.selected = 0;
                 }
                 Key::Char('n') => {
-                    app.dispatch(IoEvent::CreateNewInstance);
+                    app.dispatch(IoEvent::NewInstance);
                     app.state.new_instance.inner = InnerState::Install;
                     app.state.new_instance.selected = 0;
                 }
@@ -183,7 +183,7 @@ impl RouteImpl for Impl {
                     if app.state.new_instance.selected == 0 {
                         app.state.new_instance.inner = InnerState::ForgeNotice;
                     } else {
-                        app.dispatch(IoEvent::CreateNewInstance);
+                        app.dispatch(IoEvent::NewInstance);
                         app.state.new_instance.inner = InnerState::Install;
                     }
                     app.state.new_instance.selected = 0;
@@ -192,7 +192,7 @@ impl RouteImpl for Impl {
             },
             InnerState::ForgeNotice => match key {
                 Key::Enter => {
-                    app.dispatch(IoEvent::FetchForgeVersionManifest);
+                    app.dispatch(IoEvent::NewInstanceFetchForgeVersionManifest);
                     app.state.new_instance.inner = InnerState::FetchForgeVersionManifest;
                 }
                 _ => {}
@@ -256,7 +256,7 @@ impl RouteImpl for Impl {
                                 .clone()
                                 .clone(),
                         );
-                        app.dispatch(IoEvent::CreateNewInstance);
+                        app.dispatch(IoEvent::NewInstance);
                         app.state.new_instance.inner = InnerState::Install;
                         app.state.new_instance.selected = 0;
                     }

@@ -14,9 +14,9 @@ pub enum MenuOption {
     PlayShowLog,            // TODO
     ManageMods,             // TODO
     ChangeMinecraftVersion, // TODO
-    ChangeForgeVersion,     // TODO
-    AddForge,               // TODO
-    RemoveForge,            // TODO
+    ChangeForgeVersion,
+    AddForge,
+    RemoveForge,
     OpenDirectory,
     Rename,
     Remove,
@@ -131,6 +131,21 @@ impl RouteImpl for Impl {
                     app.state.remove_instance = remove_instance::State::new(instance);
                     app.pop_route();
                     app.push_route(Route::RemoveInstance);
+                }
+                MenuOption::AddForge => {
+                    let instance = app.state.instance_menu.instance.clone().unwrap();
+                    app.state.add_forge = add_forge::State::new(instance);
+                    app.pop_route();
+                    app.push_route(Route::AddForge);
+                }
+                MenuOption::ChangeForgeVersion => {
+                    let instance = app.state.instance_menu.instance.clone().unwrap();
+                    app.state.add_forge = add_forge::State::new(instance);
+                    app.pop_route();
+                    app.push_route(Route::AddForge);
+                }
+                MenuOption::RemoveForge => {
+                    app.dispatch(IoEvent::RemoveForge);
                 }
                 _ => {}
             },

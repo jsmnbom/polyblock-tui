@@ -46,7 +46,6 @@ impl RouteImpl for Impl {
             Key::Enter => {
                 if app.state.rename_instance.error.is_none() {
                     app.dispatch(IoEvent::RenameInstance);
-                    app.pop_route();
                 }
             }
             _ => {}
